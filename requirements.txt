@@ -1,5 +1,5 @@
 # Generated requirements for HuggingFace Spaces deployment
-# For local development, use: uv pip install -e .
+# For local development, use: uv pip install -r requirements.txt
 
 streamlit>=1.29.0
 langchain>=0.1.0
