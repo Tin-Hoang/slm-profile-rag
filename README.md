@@ -17,6 +17,27 @@ A RAG (Retrieval-Augmented Generation) chatbot for recruiters to Q&A on your pro
 - [UV](https://github.com/astral-sh/uv) package manager
 - [Ollama](https://ollama.ai/) installed and running locally
 
+## Quick Start
+
+The fastest way to get started:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/Tin-Hoang/slm-profile-rag.git
+cd slm-profile-rag
+
+# 2. Run the setup script
+chmod +x run.sh
+./run.sh
+```
+
+The script will:
+- Create a virtual environment
+- Install dependencies
+- Create .env file from template
+- Check Ollama connection
+- Launch the application
+
 ## Installation
 
 1. **Clone the repository**:
@@ -219,6 +240,15 @@ prompts:
 **Memory issues**:
 - Reduce `chunk_size` in config.yaml
 - Use a smaller model (e.g., `llama2:7b` instead of `llama2:13b`)
+
+## Security
+
+This project follows secure coding practices:
+- Server binds to `127.0.0.1` by default for local development (configurable)
+- Environment variables used for sensitive configuration
+- Logging instead of print statements for production code
+- No hardcoded credentials
+- CodeQL security scanning passed with no alerts
 
 ## License
 
