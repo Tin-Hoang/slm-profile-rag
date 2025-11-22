@@ -1,0 +1,39 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install UV
+      run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    - name: Install dependencies
+      run: |
+        uv venv
+        source .venv/bin/activate
+        uv pip install -r requirements.txt
+        uv pip install ruff pytest pytest-cov
+
+    - name: Run Ruff Check
+      run: |
+        source .venv/bin/activate
+        ruff check .
+
+    - name: Run Ruff Format Check
+      run: |
+        source .venv/bin/activate
+        ruff format --check .
+
