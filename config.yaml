@@ -1,0 +1,55 @@
+# RAG Chatbot Configuration
+
+# Model Configuration
+model:
+  name: "llama2"
+  temperature: 0.7
+  max_tokens: 500
+  
+# Document Processing
+documents:
+  chunk_size: 1000
+  chunk_overlap: 200
+  supported_formats:
+    - pdf
+    - html
+    - txt
+    - md
+
+# Vector Store Configuration
+vector_store:
+  type: "chromadb"
+  persist_directory: "./vector_store"
+  collection_name: "profile_documents"
+  
+# Retrieval Configuration
+retrieval:
+  top_k: 3
+  search_type: "similarity"
+  
+# UI Configuration
+ui:
+  title: "Profile Q&A Assistant"
+  description: "Ask questions about my background, experience, and skills"
+  examples:
+    - "What is your educational background?"
+    - "Tell me about your work experience"
+    - "What are your key skills?"
+    - "What projects have you worked on?"
+  theme: "default"
+  share: false
+
+# Prompt Templates
+prompts:
+  system_prompt: |
+    You are a helpful assistant answering questions about a candidate's profile.
+    Use the provided context to answer questions accurately.
+    If you don't know the answer based on the context, say so.
+    Be professional and concise in your responses.
+  
+  qa_prompt: |
+    Context: {context}
+    
+    Question: {question}
+    
+    Answer based on the context above:

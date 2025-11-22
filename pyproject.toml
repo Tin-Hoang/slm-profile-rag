@@ -1,0 +1,79 @@
+[build-system]
+requires = ["hatchling>=1.21.0", "versioningit>=2.0.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "slm-profile-rag"
+dynamic = ["version"]
+description = "RAG Chatbot on my profile using small language model"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "cin-tin", email = "" }
+]
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "gradio>=4.0.0",
+    "langchain>=0.1.0",
+    "langchain-community>=0.0.20",
+    "chromadb>=0.4.22",
+    "pypdf>=4.0.0",
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0",
+    "ollama>=0.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.1.0",
+    "pytest>=7.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Tin-Hoang/slm-profile-rag"
+
+[tool.hatch.version]
+source = "versioningit"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/slm_profile_rag"]
+
+[tool.versioningit]
+default-version = "0.1.0"
+
+[tool.versioningit.format]
+distance = "{base_version}+{distance}.{vcs}{rev}"
+dirty = "{base_version}+{distance}.{vcs}{rev}.dirty"
+distance-dirty = "{base_version}+{distance}.{vcs}{rev}.dirty"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
