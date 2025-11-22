@@ -1,0 +1,17 @@
+# Generated requirements for HuggingFace Spaces deployment
+# For local development, use: uv pip install -e .
+
+streamlit>=1.29.0
+langchain>=0.1.0
+langchain-community>=0.0.13
+langchain-huggingface>=0.0.1
+chromadb>=0.4.22
+sentence-transformers>=2.2.2
+pypdf>=3.17.0
+python-docx>=1.1.0
+beautifulsoup4>=4.12.0
+python-dotenv>=1.0.0
+pyyaml>=6.0.1
+ollama>=0.1.0
+lxml>=4.9.0
+
