@@ -3,6 +3,8 @@
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from slm_profile_rag.document_processor import DocumentProcessor
 
 
@@ -61,8 +63,5 @@ def test_directory_not_found():
     """Test handling of non-existent directory."""
     processor = DocumentProcessor()
 
-    try:
+    with pytest.raises(FileNotFoundError):
         processor.load_documents("/nonexistent/directory")
-        raise AssertionError("Should raise FileNotFoundError")
-    except FileNotFoundError:
-        pass

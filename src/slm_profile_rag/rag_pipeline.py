@@ -1,5 +1,6 @@
 """RAG pipeline implementation using Ollama and ChromaDB."""
 
+import logging
 from typing import Any
 
 from langchain.chains.retrieval_qa.base import RetrievalQA
@@ -10,6 +11,8 @@ from langchain_core.prompts import PromptTemplate
 
 from slm_profile_rag.config import Config
 from slm_profile_rag.document_processor import DocumentProcessor
+
+logger = logging.getLogger(__name__)
 
 
 class RAGPipeline:
@@ -60,10 +63,14 @@ class RAGPipeline:
             force_reload: Force reload documents even if vector store exists.
         """
         # Check if vector store already has documents
-        if not force_reload and self.vector_store._collection.count() > 0:
-            print(
-                f"Vector store already contains {self.vector_store._collection.count()} documents"
-            )
+        try:
+            doc_count = self.vector_store._collection.count()
+        except AttributeError:
+            # Fallback if _collection is not available
+            doc_count = 0
+
+        if not force_reload and doc_count > 0:
+            logger.info(f"Vector store already contains {doc_count} documents")
             return
 
         # Process documents
@@ -73,14 +80,14 @@ class RAGPipeline:
 
         try:
             documents = processor.process_documents(self.config.profile_docs_path)
-            print(f"Processed {len(documents)} document chunks")
+            logger.info(f"Processed {len(documents)} document chunks")
 
             # Add documents to vector store
             self.vector_store.add_documents(documents)
-            print(f"Added {len(documents)} chunks to vector store")
+            logger.info(f"Added {len(documents)} chunks to vector store")
         except (FileNotFoundError, ValueError) as e:
-            print(f"Warning: {e}")
-            print("Vector store will be empty until documents are added.")
+            logger.warning(f"Warning: {e}")
+            logger.info("Vector store will be empty until documents are added.")
 
     def create_qa_chain(self):
         """Create the question-answering chain."""
@@ -132,10 +139,10 @@ class RAGPipeline:
         Args:
             force_reload: Force reload documents even if vector store exists.
         """
-        print("Initializing RAG pipeline...")
+        logger.info("Initializing RAG pipeline...")
         self.initialize()
-        print("Loading documents...")
+        logger.info("Loading documents...")
         self.load_documents(force_reload=force_reload)
-        print("Creating QA chain...")
+        logger.info("Creating QA chain...")
         self.create_qa_chain()
-        print("RAG pipeline ready!")
+        logger.info("RAG pipeline ready!")

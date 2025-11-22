@@ -91,13 +91,19 @@ def create_ui(config: Config, rag_pipeline: RAGPipeline):
     return demo
 
 
-def launch_ui(config_path: str = "config.yaml", share: bool = False, force_reload: bool = False):
+def launch_ui(
+    config_path: str = "config.yaml",
+    share: bool = False,
+    force_reload: bool = False,
+    server_name: str = "127.0.0.1",
+):
     """Launch the Gradio UI.
 
     Args:
         config_path: Path to configuration file.
         share: Whether to create a public share link.
         force_reload: Force reload documents.
+        server_name: Server address to bind to. Use "0.0.0.0" for all interfaces.
     """
     config = Config(config_path)
     rag_pipeline = RAGPipeline(config)
@@ -106,7 +112,13 @@ def launch_ui(config_path: str = "config.yaml", share: bool = False, force_reloa
     demo = create_ui(config, rag_pipeline)
     share_setting = config.get("ui.share", share)
 
-    demo.launch(share=share_setting, server_name="0.0.0.0")
+    # Use 0.0.0.0 for Docker/Hugging Face Spaces, 127.0.0.1 for local dev
+    import os
+
+    if os.getenv("GRADIO_SERVER_NAME"):
+        server_name = os.getenv("GRADIO_SERVER_NAME")
+
+    demo.launch(share=share_setting, server_name=server_name)
 
 
 if __name__ == "__main__":

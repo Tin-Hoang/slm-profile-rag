@@ -1,11 +1,25 @@
 """Configuration loader for the RAG chatbot."""
 
+import logging
 import os
 from pathlib import Path
 from typing import Any
 
 import yaml
 from dotenv import load_dotenv
+
+
+def setup_logging(log_level: str = "INFO"):
+    """Setup logging configuration.
+
+    Args:
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
+    """
+    logging.basicConfig(
+        level=getattr(logging, log_level.upper(), logging.INFO),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
 
 class Config:
@@ -31,6 +45,9 @@ class Config:
         self.vector_store_path = os.getenv("VECTOR_STORE_PATH", "./vector_store")
         self.debug = os.getenv("DEBUG", "false").lower() == "true"
         self.log_level = os.getenv("LOG_LEVEL", "INFO")
+
+        # Setup logging
+        setup_logging(self.log_level)
 
         # YAML config values with env override
         chunk_size = os.getenv("CHUNK_SIZE")
