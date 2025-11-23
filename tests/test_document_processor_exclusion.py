@@ -1,6 +1,27 @@
 """Tests for main document exclusion in document processing."""
 
+import copy
+
+import pytest
+
+from src.config_loader import get_config
 from src.document_processor import DocumentProcessor
+
+
+@pytest.fixture(autouse=True)
+def cleanup_config():
+    """Ensure config is properly restored after each test in this module."""
+    config = get_config()
+    # Save original get method
+    original_get = config.get
+    # Save original config
+    original_config = copy.deepcopy(config._config)
+
+    yield
+
+    # Restore original get method and config
+    config.get = original_get
+    config._config = original_config
 
 
 class TestMainDocumentExclusion:

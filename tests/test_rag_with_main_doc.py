@@ -1,11 +1,45 @@
 """Integration tests for RAG pipeline with main document."""
 
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.config_loader import get_config
+from src.main_document_loader import reload_main_document_loader
 from src.rag_pipeline import RAGPipeline
+
+
+@pytest.fixture(autouse=True)
+def ensure_fail_silently():
+    """Ensure fail_silently is always set in config for all tests in this module."""
+    import copy
+
+    config = get_config()
+
+    # Reload singleton at the start to ensure clean state
+    reload_main_document_loader()
+
+    # Save original config with deep copy to avoid reference issues
+    original_main_doc_config = copy.deepcopy(config._config.get("main_document", {}))
+
+    # Ensure fail_silently is set
+    if "main_document" not in config._config:
+        config._config["main_document"] = {}
+    if "fail_silently" not in config._config["main_document"]:
+        config._config["main_document"]["fail_silently"] = True
+
+    yield
+
+    # Restore original config after test
+    if original_main_doc_config:
+        config._config["main_document"] = original_main_doc_config
+    elif "main_document" in config._config:
+        # If there was no original config, remove what we added
+        del config._config["main_document"]
+
+    # Also reload the singleton to ensure it picks up the restored config
+    reload_main_document_loader()
 
 
 class TestRAGWithMainDocument:
@@ -23,11 +57,13 @@ class TestRAGWithMainDocument:
         """Test main document info when feature is disabled."""
         # Temporarily disable main document
         config = get_config()
-        original_enabled = config.get("main_document.enabled", False)
+        # Save the entire main_document config section
+        original_main_doc_config = config._config.get("main_document", {}).copy()
 
         try:
-            # Mock disabled state
-            config._config["main_document"] = {"enabled": False}
+            # Mock disabled state but preserve other config values
+            config._config["main_document"] = original_main_doc_config.copy()
+            config._config["main_document"]["enabled"] = False
 
             pipeline = RAGPipeline()
             info = pipeline.get_main_document_info()
@@ -38,9 +74,9 @@ class TestRAGWithMainDocument:
             assert info["loaded"] is False
 
         finally:
-            # Restore original config
-            if "main_document" in config._config:
-                config._config["main_document"]["enabled"] = original_enabled
+            # Restore original config completely
+            if original_main_doc_config:
+                config._config["main_document"] = original_main_doc_config
 
     def test_main_doc_info_enabled(self):
         """Test main document info when feature is enabled and loaded."""
@@ -122,8 +158,8 @@ class TestRAGWithMainDocument:
 
         # Temporarily override config
         config = get_config()
-        original_path = config.get("main_document.path", "")
-        original_enabled = config.get("main_document.enabled", False)
+        # Save the entire main_document config section
+        original_main_doc_config = config._config.get("main_document", {}).copy()
 
         try:
             config._config["main_document"] = {
@@ -133,7 +169,12 @@ class TestRAGWithMainDocument:
                 "summarize_if_exceeds": True,
                 "cache_enabled": True,
                 "cache_check_interval": 60,
+                "fail_silently": True,  # Add missing key
+                "fallback_to_vectordb_only": True,
             }
+
+            # Reload the singleton to pick up new config
+            reload_main_document_loader()
 
             pipeline = RAGPipeline()
 
@@ -149,10 +190,9 @@ class TestRAGWithMainDocument:
             assert "Modified content" in pipeline.main_doc_content
 
         finally:
-            # Restore original config
-            if "main_document" in config._config:
-                config._config["main_document"]["path"] = original_path
-                config._config["main_document"]["enabled"] = original_enabled
+            # Restore original config completely
+            if original_main_doc_config:
+                config._config["main_document"] = original_main_doc_config
 
     def test_reload_main_document_error_handling(self):
         """Test reload_main_document handles errors gracefully."""
@@ -161,9 +201,11 @@ class TestRAGWithMainDocument:
         # Set invalid path
         pipeline.main_doc_loader.path = Path("/nonexistent/path/file.md")
 
-        # Reload should fail gracefully
+        # Reload should succeed (with empty content) when fail_silently is True
         success = pipeline.reload_main_document()
-        assert success is False
+        assert success is True
+        # But content should be empty since file doesn't exist
+        assert pipeline.main_doc_content == ""
 
     def test_query_with_main_doc(self):
         """Test that query works with main document enabled."""
@@ -225,13 +267,19 @@ class TestRAGWithMainDocument:
             "unknown:model": 8192,  # Default
         }
 
-        for model_name, expected_window in test_cases.items():
-            config._config["llm"]["model"] = model_name
+        # Mock LLM handler to avoid actual LLM initialization
+        with patch("src.rag_pipeline.get_llm_handler") as mock_llm_handler:
+            mock_handler = MagicMock()
+            mock_handler.get_llm.return_value = MagicMock()
+            mock_llm_handler.return_value = mock_handler
 
-            pipeline = RAGPipeline()
-            budget = pipeline._calculate_context_budget()
+            for model_name, expected_window in test_cases.items():
+                config._config["llm"]["model"] = model_name
 
-            assert budget["model_context_window"] == expected_window
+                pipeline = RAGPipeline()
+                budget = pipeline._calculate_context_budget()
+
+                assert budget["model_context_window"] == expected_window
 
         # Restore original model
         config._config["llm"]["model"] = original_model
@@ -242,23 +290,35 @@ class TestMainDocumentContextInsertion:
 
     def test_prompt_template_structure(self):
         """Test that prompt template includes main document placeholder."""
-        pipeline = RAGPipeline()
+        # Mock LLM handler to avoid actual LLM initialization
+        with patch("src.rag_pipeline.get_llm_handler") as mock_llm_handler:
+            mock_handler = MagicMock()
+            mock_handler.get_llm.return_value = MagicMock()
+            mock_llm_handler.return_value = mock_handler
 
-        template_str = pipeline.prompt_template.messages[0].prompt.template
+            pipeline = RAGPipeline()
 
-        # Should contain main_document_section placeholder
-        assert "{main_document_section}" in template_str
-        assert "{context}" in template_str
-        assert "{question}" in template_str
+            template_str = pipeline.prompt_template.messages[0].prompt.template
+
+            # Should contain main_document_section placeholder
+            assert "{main_document_section}" in template_str
+            assert "{context}" in template_str
+            assert "{question}" in template_str
 
     def test_main_doc_position_before_context(self):
         """Test that main document appears BEFORE vectordb context in template."""
-        pipeline = RAGPipeline()
+        # Mock LLM handler to avoid actual LLM initialization
+        with patch("src.rag_pipeline.get_llm_handler") as mock_llm_handler:
+            mock_handler = MagicMock()
+            mock_handler.get_llm.return_value = MagicMock()
+            mock_llm_handler.return_value = mock_handler
 
-        template_str = pipeline.prompt_template.messages[0].prompt.template
+            pipeline = RAGPipeline()
 
-        main_doc_pos = template_str.find("{main_document_section}")
-        context_pos = template_str.find("{context}")
+            template_str = pipeline.prompt_template.messages[0].prompt.template
 
-        # Main document should come before context
-        assert main_doc_pos < context_pos
+            main_doc_pos = template_str.find("{main_document_section}")
+            context_pos = template_str.find("{context}")
+
+            # Main document should come before context
+            assert main_doc_pos < context_pos

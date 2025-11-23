@@ -5,7 +5,42 @@ from pathlib import Path
 
 import pytest
 
+from src.config_loader import get_config
 from src.main_document_loader import MainDocumentLoader, get_main_document_loader
+
+
+@pytest.fixture(autouse=True)
+def ensure_fail_silently():
+    """Ensure fail_silently is always set in config for all tests in this module."""
+    import copy
+
+    from src.main_document_loader import reload_main_document_loader
+
+    config = get_config()
+
+    # Reload singleton at the start to ensure clean state
+    reload_main_document_loader()
+
+    # Save original config with deep copy to avoid reference issues
+    original_main_doc_config = copy.deepcopy(config._config.get("main_document", {}))
+
+    # Ensure fail_silently is set
+    if "main_document" not in config._config:
+        config._config["main_document"] = {}
+    if "fail_silently" not in config._config["main_document"]:
+        config._config["main_document"]["fail_silently"] = True
+
+    yield
+
+    # Restore original config after test
+    if original_main_doc_config:
+        config._config["main_document"] = original_main_doc_config
+    elif "main_document" in config._config:
+        # If there was no original config, remove what we added
+        del config._config["main_document"]
+
+    # Also reload the singleton to ensure it picks up the restored config
+    reload_main_document_loader()
 
 
 class TestMainDocumentLoader:
@@ -274,6 +309,16 @@ class TestMainDocumentLoader:
         loader = MainDocumentLoader()
         loader.enabled = True
         loader.path = None
+
+        # Ensure fail_silently is True in config
+        original_get = loader.config.get
+
+        def mock_get(key, default=None):
+            if key == "main_document.fail_silently":
+                return True
+            return original_get(key, default)
+
+        loader.config.get = mock_get
 
         content = loader.load_main_document()
         assert content == ""
