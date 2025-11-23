@@ -2,6 +2,13 @@
 
 ## System Architecture
 
+<p align="center">
+  <img src="docs/arch_system_design.png" alt="System Architecture Diagram" width="900" />
+</p>
+<p align="center"><em>High-level system architecture diagram illustrating the complete RAG pipeline flow</em></p>
+
+### Detailed Component View
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                      User Interface                          │

@@ -13,6 +13,11 @@ A RAG (Retrieval Augmented Generation) chatbot that answers questions about your
 
 ## 🏗️ Architecture
 
+<p align="center">
+  <img src="docs/arch_system_design.png" alt="System Architecture Diagram" width="800" />
+</p>
+<p align="center"><em>Overall system design showing the RAG pipeline and component interactions</em></p>
+
 ```
 Documents → Document Processor → Embeddings → ChromaDB
                                                   ↓
