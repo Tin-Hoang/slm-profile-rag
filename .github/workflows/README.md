@@ -2,13 +2,11 @@
 
 This directory contains automated CI/CD workflows for the SLM Profile RAG project.
 
-```markdown
 ![Tests](https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/tests.yml/badge.svg)
 ![Lint](https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/lint.yml/badge.svg)
 ![Code Quality](https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/code-quality.yml/badge.svg)
 ![Security Scan](https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/security-scan.yml/badge.svg)
 [![codecov](https://codecov.io/gh/Tin-Hoang/slm-profile-rag/branch/main/graph/badge.svg)](https://codecov.io/gh/Tin-Hoang/slm-profile-rag)
-```
 
 ## Workflows Overview
 
