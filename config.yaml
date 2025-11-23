@@ -1,0 +1,127 @@
+# RAG Chatbot Configuration
+
+# Profile Information
+profile:
+  name: "Tin Hoang"  # Change to your name
+  title: "AI Research Engineer | MLOps Engineer"
+  greeting: "Hi! I'm a chatbot trained on {name}'s professional background. Ask me anything about their experience, skills, and projects!"
+
+# LLM Configuration
+llm:
+  provider: "ollama"  # Options: ollama, openai, anthropic, groq
+  model: "llama3.2:3b"  # For Ollama. Other options: phi3:mini, gemma2:2b
+  temperature: 0.7
+  max_tokens: 512
+  top_p: 0.9
+
+  # System prompt template
+  system_prompt: |
+    You are a helpful AI assistant representing {name}, a {title}.
+    You have been trained on their resume, project reports, LinkedIn profile, and other professional documents.
+
+    Your role is to answer questions about {name}'s:
+    - Professional experience and work history
+    - Technical skills and expertise
+    - Projects and accomplishments
+    - Education and certifications
+    - Interests and personality (based on available information)
+
+    Guidelines:
+    - Be professional, friendly, and concise
+    - Only answer based on the provided context
+    - If you don't know something, say "I don't have that information in {name}'s profile"
+    - Don't make up information
+    - Use first person when describing {name}'s experience (e.g., "I worked at...")
+    - Highlight relevant achievements and skills
+
+# Embedding Model Configuration
+embeddings:
+  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  # Alternative: "sentence-transformers/all-mpnet-base-v2" (better quality, slower)
+  device: "cpu"  # Options: cpu, cuda, mps
+
+# Vector Database Configuration
+vectorstore:
+  type: "chroma"
+  collection_name: "profile_documents"
+  persist_directory: "./chroma_db"
+
+  # Search configuration
+  search_type: "similarity"  # Options: similarity, mmr
+  search_kwargs:
+    k: 4  # Number of documents to retrieve
+    fetch_k: 20  # For MMR
+    lambda_mult: 0.5  # For MMR diversity
+
+# Document Processing Configuration
+document_processing:
+  # Chunking strategy
+  chunk_size: 1000  # Characters per chunk
+  chunk_overlap: 200  # Overlap between chunks
+
+  # Supported file types
+  supported_extensions:
+    - .pdf
+    - .docx
+    - .doc
+    - .html
+    - .htm
+    - .txt
+    - .md
+
+  # PDF processing
+  pdf:
+    extract_images: false
+
+  # HTML processing
+  html:
+    parse_tables: true
+    strip_tags: true
+
+# RAG Pipeline Configuration
+rag:
+  # Retrieval settings
+  retrieval_mode: "contextual"  # Options: simple, contextual, hybrid
+
+  # Reranking (optional, set to false if not using)
+  use_reranking: false
+
+  # Context window
+  max_context_length: 3000  # Characters of context to include
+
+  # Response settings
+  include_sources: true  # Show source documents in response
+  source_max_length: 150  # Max length of source preview
+
+# UI Configuration
+ui:
+  page_title: "💬 Profile Q&A Chatbot"
+  page_icon: "🤖"
+  layout: "centered"  # Options: centered, wide
+
+  # Styling
+  theme:
+    primary_color: "#FF4B4B"
+    background_color: "#FFFFFF"
+    secondary_background_color: "#F0F2F6"
+    text_color: "#262730"
+
+  # Chat settings
+  max_chat_history: 50
+  show_timestamps: true
+
+  # Example questions
+  example_questions:
+    - "What is {name}'s background?"
+    - "What are {name}'s key technical skills?"
+    - "Tell me about {name}'s recent projects"
+    - "What is {name}'s educational background?"
+    - "What kind of roles is {name} looking for?"
+
+# Logging Configuration
+logging:
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "app.log"
+  max_bytes: 10485760  # 10MB
+  backup_count: 3
