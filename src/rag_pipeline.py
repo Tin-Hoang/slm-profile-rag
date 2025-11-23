@@ -3,9 +3,10 @@
 import logging
 from typing import Any
 
-from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
 from langchain_core.documents import Document
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
 
 from .config_loader import get_config
 from .llm_handler import get_llm_handler
@@ -29,17 +30,20 @@ class RAGPipeline:
         # Get LLM
         self.llm = self.llm_handler.get_llm()
 
+        # Get retriever
+        self.retriever = self.vectorstore_manager.get_retriever()
+
         # Setup prompt template
         self.prompt_template = self._create_prompt_template()
 
-        # Create QA chain
+        # Create QA chain using LCEL
         self.qa_chain = self._create_qa_chain()
 
-    def _create_prompt_template(self) -> PromptTemplate:
+    def _create_prompt_template(self) -> ChatPromptTemplate:
         """Create prompt template for RAG.
 
         Returns:
-            PromptTemplate instance
+            ChatPromptTemplate instance
         """
         system_prompt = self.llm_handler.get_system_prompt()
 
@@ -52,22 +56,34 @@ Question: {{question}}
 
 Answer: """
 
-        return PromptTemplate(template=template, input_variables=["context", "question"])
+        return ChatPromptTemplate.from_template(template)
 
-    def _create_qa_chain(self) -> RetrievalQA:
-        """Create retrieval QA chain.
+    def _format_docs(self, docs: list[Document]) -> str:
+        """Format documents into a single string.
+
+        Args:
+            docs: List of documents
 
         Returns:
-            RetrievalQA chain
+            Formatted string
         """
-        retriever = self.vectorstore_manager.get_retriever()
+        return "\n\n".join(doc.page_content for doc in docs)
 
-        chain = RetrievalQA.from_chain_type(
-            llm=self.llm,
-            chain_type="stuff",
-            retriever=retriever,
-            return_source_documents=self.config.get("rag.include_sources", True),
-            chain_type_kwargs={"prompt": self.prompt_template},
+    def _create_qa_chain(self):
+        """Create retrieval QA chain using LCEL.
+
+        Returns:
+            LCEL chain
+        """
+        # Create the RAG chain using LCEL
+        chain = (
+            {
+                "context": self.retriever | self._format_docs,
+                "question": RunnablePassthrough(),
+            }
+            | self.prompt_template
+            | self.llm
+            | StrOutputParser()
         )
 
         return chain
@@ -84,13 +100,19 @@ Answer: """
         logger.info(f"Processing query: {question}")
 
         try:
-            response = self.qa_chain.invoke({"query": question})
+            # Get the answer from the chain
+            answer = self.qa_chain.invoke(question)
 
-            # Log retrieved sources
-            if "source_documents" in response:
-                logger.debug(f"Retrieved {len(response['source_documents'])} source documents")
+            # Retrieve source documents separately if needed
+            source_documents = []
+            if self.config.get("rag.include_sources", True):
+                source_documents = self.retriever.invoke(question)
+                logger.debug(f"Retrieved {len(source_documents)} source documents")
 
-            return response
+            return {
+                "result": answer,
+                "source_documents": source_documents,
+            }
 
         except Exception as e:
             logger.error(f"Error processing query: {e}")
