@@ -4,9 +4,6 @@ import hashlib
 import logging
 import time
 from pathlib import Path
-from typing import Optional
-
-from langchain_core.documents import Document
 
 from .config_loader import get_config
 from .document_processor import DocumentProcessor
@@ -23,8 +20,8 @@ class MainDocumentLoader:
         self.doc_processor = DocumentProcessor()
 
         # Cache management
-        self._cached_content: Optional[str] = None
-        self._cached_file_hash: Optional[str] = None
+        self._cached_content: str | None = None
+        self._cached_file_hash: str | None = None
         self._last_check_time: float = 0
 
         # Config
@@ -298,7 +295,7 @@ Provide a comprehensive summary (target: ~{target_tokens} tokens):"""
 
 
 # Singleton instance
-_loader_instance: Optional[MainDocumentLoader] = None
+_loader_instance: MainDocumentLoader | None = None
 
 
 def get_main_document_loader() -> MainDocumentLoader:

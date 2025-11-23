@@ -36,9 +36,9 @@ def build_vectorstore(documents_dir: str | None = None, force_rebuild: bool = Fa
     main_doc_enabled = config.get("main_document.enabled", False)
     main_doc_path = config.get("main_document.path", "")
     if main_doc_enabled and main_doc_path:
-        logger.info(f"Main Document Feature: ENABLED")
+        logger.info("Main Document Feature: ENABLED")
         logger.info(f"  Main document ({Path(main_doc_path).name}) will be excluded from vector store")
-        logger.info(f"  (It's loaded directly into prompts, not retrieved)")
+        logger.info("  (It's loaded directly into prompts, not retrieved)")
         logger.info("")
 
     documents_path = Path(documents_dir)

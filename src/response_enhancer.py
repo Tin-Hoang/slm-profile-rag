@@ -56,9 +56,9 @@ class ResponseEnhancer:
         topic = match.group(1).strip()
         rewrites = [
             f"For more specific details about {topic}, it would be best to connect directly.",
-            f"The available profile focuses on other aspects of the background.",
+            "The available profile focuses on other aspects of the background.",
             f"Additional information about {topic} can be discussed in a direct conversation.",
-            f"The documented profile covers the key highlights.",
+            "The documented profile covers the key highlights.",
         ]
         # Use hash to consistently select same rewrite for same topic
         idx = hash(topic) % len(rewrites)
@@ -191,11 +191,7 @@ class ResponseEnhancer:
                 last_line = formatted_lines[-1]
 
                 # Add blank before first list item
-                if is_list and not prev_was_list and last_line != '':
-                    formatted_lines.append('')
-
-                # Add blank after last list item (before regular paragraph)
-                elif not is_list and prev_was_list and last_line != '':
+                if is_list and not prev_was_list and last_line != '' or not is_list and prev_was_list and last_line != '':
                     formatted_lines.append('')
 
             formatted_lines.append(line)
@@ -253,11 +249,10 @@ class ResponseEnhancer:
 
         # If the question is about job search/roles and response seems incomplete
         # Add a modest closing about opportunities (not overly enthusiastic)
-        if re.search(r"(?:job|role|position|opportunity|looking for|seeking)", question, re.IGNORECASE):
-            if not re.search(
-                r"(?:opportunity|interview|connect|discuss|reach out|contact)", enhanced, re.IGNORECASE
-            ):
-                enhanced += " For current opportunities and detailed discussions, direct contact would be best."
+        if re.search(r"(?:job|role|position|opportunity|looking for|seeking)", question, re.IGNORECASE) and not re.search(
+            r"(?:opportunity|interview|connect|discuss|reach out|contact)", enhanced, re.IGNORECASE
+        ):
+            enhanced += " For current opportunities and detailed discussions, direct contact would be best."
 
         return enhanced
 
