@@ -91,6 +91,40 @@ document_processing:
     parse_tables: true
     strip_tags: true
 
+# Main Document Configuration
+main_document:
+  enabled: true  # Master switch for the feature
+  path: "data/documents/main_profile.md"  # Path to main document
+  max_tokens: 10000  # Maximum tokens allowed (generous limit)
+  position: "before"  # Always before VectorDB context (high priority)
+
+  # Auto-detect format from file extension
+  # Supported: .md, .txt, .pdf, .docx, .html
+
+  # Summarization settings
+  summarize_if_exceeds: true  # Use LLM to summarize if > max_tokens
+  summarization_target_tokens: 8000  # Target size after summarization
+  summarization_prompt: |
+    You are summarizing a professional profile document.
+    Extract and preserve ALL critical information including:
+    - Full name, title, and contact information
+    - Current role and key responsibilities
+    - Core technical skills and expertise areas
+    - Major projects and accomplishments with metrics
+    - Education and certifications
+    - Professional background summary
+
+    Maintain factual accuracy. Keep all numbers, dates, and specific achievements.
+    Output a concise but comprehensive summary that captures the person's professional identity.
+
+  # Caching
+  cache_enabled: true  # Cache loaded content (reload only on file change)
+  cache_check_interval: 60  # Check file modification time every N seconds
+
+  # Error handling
+  fail_silently: true  # Continue without main doc if loading fails
+  fallback_to_vectordb_only: true  # Use only VectorDB if main doc unavailable
+
 # RAG Pipeline Configuration
 rag:
   # Retrieval settings

@@ -106,28 +106,92 @@ projects.docx docx  chunks  Model
 
 **Command:** `python -m src.build_vectorstore`
 
-### 2️⃣ Query Phase (Runtime)
+### 2️⃣ Query Phase (Runtime) - WITH MAIN DOCUMENT
 
 ```
 User Question
      ↓
-Embed Question (same model as documents)
-     ↓
-Similarity Search in ChromaDB (get top-k chunks)
-     ↓
-Retrieve relevant document chunks
-     ↓
-Construct Prompt:
-  System Prompt + Retrieved Context + User Question
-     ↓
-Send to Ollama LLM
-     ↓
-Generate Answer
-     ↓
-Display in Streamlit UI (with source citations)
+┌─────────────────────────────────────┐
+│ Load Main Document (if enabled)      │
+│  • Check cache validity              │
+│  • Auto-detect format                │
+│  • Count tokens                      │
+│  • Summarize if needed               │
+└────────────┬────────────────────────┘
+             ↓
+      [Main Doc Content]
+             │
+             ├─────────────────────┐
+             ↓                     ↓
+Embed Question            Main Doc (Priority)
+     ↓                           ↓
+Similarity Search        [Always Available]
+     ↓                           ↓
+Retrieve Chunks          [10k tokens max]
+     ↓                           ↓
+[VectorDB Context]    ──────────┼──────────
+             │                   │
+             └─────────┬─────────┘
+                       ↓
+              Construct Prompt:
+   System Prompt + Main Doc + VectorDB Context + Question
+                       ↓
+              Send to Ollama LLM
+                       ↓
+              Generate Answer
+                       ↓
+         Display in Streamlit UI (with source citations)
 ```
 
 ## Component Details
+
+### 📑 Main Document Integration
+
+The Main Document feature ensures critical profile information is always available in the LLM context, regardless of VectorDB retrieval quality.
+
+```python
+MainDocumentLoader
+├── Format Auto-Detection
+│   ├── Markdown (.md)    → LangChain TextLoader
+│   ├── Plain Text (.txt) → LangChain TextLoader
+│   ├── PDF (.pdf)        → Existing PDF loader
+│   ├── Word (.docx)      → Existing DOCX loader
+│   └── HTML (.html)      → Existing HTML loader
+│
+├── Token Management
+│   ├── Counting: tiktoken (cl100k_base encoding)
+│   ├── Max Limit: 10,000 tokens (configurable)
+│   ├── Truncation: Smart token-based trimming
+│   └── Summarization: LLM-based if exceeds limit
+│
+├── Caching Strategy
+│   ├── File hash-based invalidation (MD5)
+│   ├── Configurable check interval (60s default)
+│   └── Automatic reload on file changes
+│
+└── Integration Point
+    └── Positioned BEFORE VectorDB context (high priority)
+```
+
+**Architecture Flow:**
+```
+Main Document (Priority Context)
+         ↓
+    [Essential Info Always Available]
+         ↓
+VectorDB Retrieval (Additional Context)
+         ↓
+    [Supplementary Information]
+         ↓
+Combined Context → LLM → Response
+```
+
+**Benefits:**
+- ✅ Critical information never missed by retrieval
+- ✅ Auto-format detection (no manual config)
+- ✅ Intelligent token management with LLM summarization
+- ✅ Efficient caching for performance
+- ✅ Graceful degradation if unavailable
 
 ### 📄 Document Processing Pipeline
 
@@ -369,7 +433,16 @@ src.rag_pipeline
  ├─ src.config_loader
  ├─ src.llm_handler
  ├─ src.vectorstore
+ ├─ src.main_document_loader
+ ├─ src.response_enhancer
  └─ langchain
+
+src.main_document_loader
+ ├─ src.config_loader
+ ├─ src.document_processor
+ ├─ src.llm_handler
+ ├─ tiktoken
+ └─ pathlib, hashlib, time
 
 src.vectorstore
  ├─ src.config_loader

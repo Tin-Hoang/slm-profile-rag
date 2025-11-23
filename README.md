@@ -1,11 +1,22 @@
 # 🤖 SLM Profile RAG Chatbot
 
+<p align="center">
+  <img src="https://img.shields.io/badge/LangChain-🦜-121212?style=for-the-badge" alt="LangChain"/>
+  <img src="https://img.shields.io/badge/ChromaDB-Vector_DB-FF6F61?style=for-the-badge" alt="ChromaDB"/>
+  <img src="https://img.shields.io/badge/Ollama-🦙-000000?style=for-the-badge" alt="Ollama"/>
+  <img src="https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white" alt="Streamlit"/>
+  <img src="https://img.shields.io/badge/HuggingFace-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black" alt="HuggingFace"/>
+  <img src="https://img.shields.io/badge/Ruff-D7FF64?style=for-the-badge&logo=ruff&logoColor=black" alt="Ruff"/>
+  <img src="https://img.shields.io/badge/UV-DE5FE9?style=for-the-badge&logo=astral&logoColor=white" alt="UV"/>
+</p>
+
 A RAG (Retrieval Augmented Generation) chatbot that answers questions about your professional profile using your resume, project reports, and other documents.
 
 ## ✨ Features
 
 - 📄 **Multi-format Support**: Process PDF, Word, HTML, and text documents
 - 🧠 **RAG Pipeline**: Semantic search with vector database (ChromaDB)
+- 📌 **Main Document Support**: Guaranteed context - critical information always available, auto-format detection
 - 🦙 **Ollama Integration**: Run small language models locally
 - 🎨 **Clean UI**: Streamlit-based interface
 - ⚙️ **Highly Configurable**: YAML-based settings for easy customization
@@ -29,6 +40,7 @@ Detailed architecture can be found in [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Ollama** for local LLM serving
 - **Streamlit** for web interface
 - **sentence-transformers** for embeddings
+- **tiktoken** for token counting
 - **Ruff** for linting/formatting
 
 ## 📦 Installation
@@ -74,7 +86,52 @@ Detailed architecture can be found in [ARCHITECTURE.md](ARCHITECTURE.md).
    # Copy your resume, project reports, LinkedIn profile, etc.
    ```
 
-6. **Pull Ollama model**:
+6. **Create your Main Profile Document** (📌 **Recommended**):
+
+   The Main Document feature ensures critical information is **always** included in responses, never missed by vector search.
+
+   ```bash
+   # Create main profile document (any format: .md, .txt, .pdf, .docx, .html)
+   nano data/documents/main_profile.md
+   ```
+
+   **Include essential information:**
+   - Full name, title, contact info
+   - Current role and key responsibilities
+   - Core skills and expertise
+   - Major projects with metrics
+   - Education and certifications
+
+   **Example structure:**
+   ```markdown
+   # Your Name
+   **Title**: Your Professional Title
+   **Email**: your.email@example.com
+
+   ## Professional Summary
+   Brief summary of your experience...
+
+   ## Core Skills
+   - Skill 1, Skill 2, Skill 3
+
+   ## Current Role
+   ### Company - Role (Dates)
+   - Achievement 1 with metrics
+   - Achievement 2 with metrics
+
+   ## Education
+   - Degree, University, Year
+   ```
+
+   **Why use this?**
+   - ✅ **Guaranteed Context**: Critical info never missed by vector similarity search
+   - ✅ **Priority Positioning**: Appears BEFORE retrieved chunks (higher LLM attention)
+   - ✅ **Auto-Format Detection**: Supports MD, TXT, PDF, DOCX, HTML automatically
+   - ✅ **Smart Token Management**: LLM-based summarization if content exceeds 10k tokens
+
+   The feature is enabled by default in `config.yaml`. See [docs/MAIN_DOCUMENT_GUIDE.md](docs/MAIN_DOCUMENT_GUIDE.md) for advanced configuration.
+
+7. **Pull Ollama model**:
    ```bash
    ollama pull llama3.2:3b
    # Or other small models: phi3:mini, gemma2:2b
@@ -177,7 +234,8 @@ slm-profile-rag/
 │   ├── vectorstore.py              # ChromaDB operations
 │   ├── llm_handler.py              # Ollama/LLM interface
 │   ├── rag_pipeline.py             # RAG chain logic
-│   ├── response_enhancer.py        # Response post-processing (NEW!)
+│   ├── main_document_loader.py     # Main document management (NEW!)
+│   ├── response_enhancer.py        # Response post-processing
 │   ├── config_loader.py            # Load config.yaml & .env
 │   └── build_vectorstore.py        # CLI to build vector DB
 ├── chroma_db/                      # Vector database (auto-generated)
