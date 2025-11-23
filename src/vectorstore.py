@@ -145,9 +145,7 @@ class VectorStoreManager:
             f"Creating retriever with search_type={search_type}, search_kwargs={filtered_kwargs}"
         )
 
-        return self.vectorstore.as_retriever(
-            search_type=search_type, search_kwargs=filtered_kwargs
-        )
+        return self.vectorstore.as_retriever(search_type=search_type, search_kwargs=filtered_kwargs)
 
     def add_documents(self, documents: list[Document]) -> None:
         """Add new documents to existing vector store.
