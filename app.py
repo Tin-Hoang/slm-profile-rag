@@ -31,6 +31,9 @@ def init_session_state():
     if "config" not in st.session_state:
         st.session_state.config = None
 
+    if "pending_question" not in st.session_state:
+        st.session_state.pending_question = None
+
 
 def load_config():
     """Load configuration."""
@@ -126,7 +129,7 @@ def display_sidebar():
         for question in example_questions:
             formatted_q = config.format_template(question)
             if st.button(formatted_q, key=f"example_{hash(formatted_q)}"):
-                st.session_state.messages.append({"role": "user", "content": formatted_q})
+                st.session_state.pending_question = formatted_q
                 st.rerun()
 
         st.divider()
@@ -251,6 +254,13 @@ def main():
 
     # Display chat messages
     display_chat_messages()
+
+    # Process pending question from example button click
+    if st.session_state.pending_question:
+        pending = st.session_state.pending_question
+        st.session_state.pending_question = None
+        process_user_input(pending)
+        st.rerun()
 
     # Chat input
     if prompt := st.chat_input("Ask me anything about the profile..."):

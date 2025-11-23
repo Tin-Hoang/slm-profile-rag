@@ -1,4 +1,4 @@
-# 🤖 LLM Profile Chatbot
+# 🤖 SLM Profile RAG Chatbot
 
 A RAG (Retrieval Augmented Generation) chatbot that answers questions about your professional profile using your resume, project reports, and other documents.
 
