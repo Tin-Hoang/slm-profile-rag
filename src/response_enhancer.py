@@ -133,6 +133,76 @@ class ResponseEnhancer:
 
         return text
 
+    def _fix_markdown_formatting(self, text: str) -> str:
+        """Fix markdown formatting issues, particularly inline numbered lists.
+
+        Args:
+            text: Response text with potential formatting issues
+
+        Returns:
+            Text with properly formatted markdown
+        """
+        # Simple but effective approach: Replace inline list patterns with line-broken versions
+
+        # Step 1: Fix inline numbered lists
+        # Pattern: Find any text that has "1. text 2. text" (not already on separate lines)
+        # We'll use a simple replace: put newline before each " N. " where N is a digit
+
+        # But first, protect already well-formatted lists (those at start of line)
+        lines = text.split('\n')
+        protected_lines = []
+
+        for line in lines:
+            stripped = line.strip()
+            # Check if line starts with a number (already formatted list)
+            if re.match(r'^\d+\.\s+', stripped):
+                # Protect by temporarily marking it
+                protected_lines.append('___LISTITEM___' + line)
+            else:
+                protected_lines.append(line)
+
+        text = '\n'.join(protected_lines)
+
+        # Now fix inline lists: add line break before each " 1.", " 2.", etc.
+        # But only if it's in the middle of text (has non-whitespace before it)
+        text = re.sub(r'([^\n])\s+(\d+)\.\s+([A-Z])', r'\1\n\n\2. \3', text)
+
+        # Remove protection markers
+        text = text.replace('___LISTITEM___', '')
+
+        # Step 2: Ensure proper blank lines between elements
+        lines = text.split('\n')
+        formatted_lines = []
+        prev_was_list = False
+
+        for line in lines:
+            stripped = line.strip()
+
+            if not stripped:
+                # Don't add multiple blank lines in a row
+                if formatted_lines and formatted_lines[-1] != '':
+                    formatted_lines.append('')
+                continue
+
+            is_list = bool(re.match(r'^\d+\.|^-\s+|^\*\s+', stripped))
+
+            # Add blank line transitions
+            if formatted_lines:
+                last_line = formatted_lines[-1]
+
+                # Add blank before first list item
+                if is_list and not prev_was_list and last_line != '':
+                    formatted_lines.append('')
+
+                # Add blank after last list item (before regular paragraph)
+                elif not is_list and prev_was_list and last_line != '':
+                    formatted_lines.append('')
+
+            formatted_lines.append(line)
+            prev_was_list = is_list
+
+        return '\n'.join(formatted_lines)
+
     def enhance(self, response: str) -> str:
         """Enhance response by removing negative language and adding positive tone.
 
@@ -159,8 +229,11 @@ class ResponseEnhancer:
         # Add positive closing if needed
         enhanced = self._add_positive_closing(enhanced)
 
+        # Fix markdown formatting
+        enhanced = self._fix_markdown_formatting(enhanced)
+
         # Clean up any double spaces or awkward punctuation
-        enhanced = re.sub(r"\s+", " ", enhanced)
+        enhanced = re.sub(r" +", " ", enhanced)  # Multiple spaces to single space
         enhanced = re.sub(r"\s+([.,!?])", r"\1", enhanced)
         enhanced = re.sub(r"([.!?])\s*([.!?])", r"\1", enhanced)
 
