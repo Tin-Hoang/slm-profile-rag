@@ -226,9 +226,7 @@ Provide a comprehensive summary (target: ~{target_tokens} tokens):"""
             # Verify summary is actually shorter
             summary_tokens = self.count_tokens(summary)
             if summary_tokens > self.max_tokens:
-                logger.warning(
-                    f"Summary still exceeds limit ({summary_tokens} tokens), truncating"
-                )
+                logger.warning(f"Summary still exceeds limit ({summary_tokens} tokens), truncating")
                 summary = self.truncate_to_tokens(summary, self.max_tokens)
 
             return summary
@@ -319,4 +317,3 @@ def reload_main_document_loader() -> MainDocumentLoader:
     global _loader_instance
     _loader_instance = MainDocumentLoader()
     return _loader_instance
-

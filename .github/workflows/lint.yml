@@ -36,4 +36,3 @@ jobs:
       run: |
         source .venv/bin/activate
         ruff format --check .
-

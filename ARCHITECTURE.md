@@ -556,4 +556,3 @@ VectorStoreManager(embedding_model="...")
 - ✅ Performance (optimized for small-medium datasets)
 - ✅ Privacy (local processing)
 - ✅ Deployability (cloud-ready)
-

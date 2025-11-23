@@ -281,4 +281,3 @@ MIT License - see LICENSE file
 ---
 
 **Note**: Remember to update `config.yaml` with your personal information before deploying!
-

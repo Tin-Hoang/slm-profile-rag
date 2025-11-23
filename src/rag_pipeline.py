@@ -310,7 +310,9 @@ Answer: """
         logger.debug(f"Token budget: {budget}")
 
         # Warning if main doc is too large
-        usage_percent = (main_doc_tokens / model_context_window) * 100 if model_context_window > 0 else 0
+        usage_percent = (
+            (main_doc_tokens / model_context_window) * 100 if model_context_window > 0 else 0
+        )
         if usage_percent > 50:
             logger.warning(
                 f"Main document uses {usage_percent:.1f}% of context window. "

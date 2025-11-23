@@ -149,29 +149,29 @@ class ResponseEnhancer:
         # We'll use a simple replace: put newline before each " N. " where N is a digit
 
         # But first, protect already well-formatted lists (those at start of line)
-        lines = text.split('\n')
+        lines = text.split("\n")
         protected_lines = []
 
         for line in lines:
             stripped = line.strip()
             # Check if line starts with a number (already formatted list)
-            if re.match(r'^\d+\.\s+', stripped):
+            if re.match(r"^\d+\.\s+", stripped):
                 # Protect by temporarily marking it
-                protected_lines.append('___LISTITEM___' + line)
+                protected_lines.append("___LISTITEM___" + line)
             else:
                 protected_lines.append(line)
 
-        text = '\n'.join(protected_lines)
+        text = "\n".join(protected_lines)
 
         # Now fix inline lists: add line break before each " 1.", " 2.", etc.
         # But only if it's in the middle of text (has non-whitespace before it)
-        text = re.sub(r'([^\n])\s+(\d+)\.\s+([A-Z])', r'\1\n\n\2. \3', text)
+        text = re.sub(r"([^\n])\s+(\d+)\.\s+([A-Z])", r"\1\n\n\2. \3", text)
 
         # Remove protection markers
-        text = text.replace('___LISTITEM___', '')
+        text = text.replace("___LISTITEM___", "")
 
         # Step 2: Ensure proper blank lines between elements
-        lines = text.split('\n')
+        lines = text.split("\n")
         formatted_lines = []
         prev_was_list = False
 
@@ -180,24 +180,31 @@ class ResponseEnhancer:
 
             if not stripped:
                 # Don't add multiple blank lines in a row
-                if formatted_lines and formatted_lines[-1] != '':
-                    formatted_lines.append('')
+                if formatted_lines and formatted_lines[-1] != "":
+                    formatted_lines.append("")
                 continue
 
-            is_list = bool(re.match(r'^\d+\.|^-\s+|^\*\s+', stripped))
+            is_list = bool(re.match(r"^\d+\.|^-\s+|^\*\s+", stripped))
 
             # Add blank line transitions
             if formatted_lines:
                 last_line = formatted_lines[-1]
 
                 # Add blank before first list item
-                if is_list and not prev_was_list and last_line != '' or not is_list and prev_was_list and last_line != '':
-                    formatted_lines.append('')
+                if (
+                    is_list
+                    and not prev_was_list
+                    and last_line != ""
+                    or not is_list
+                    and prev_was_list
+                    and last_line != ""
+                ):
+                    formatted_lines.append("")
 
             formatted_lines.append(line)
             prev_was_list = is_list
 
-        return '\n'.join(formatted_lines)
+        return "\n".join(formatted_lines)
 
     def enhance(self, response: str) -> str:
         """Enhance response by removing negative language and adding positive tone.
@@ -249,10 +256,14 @@ class ResponseEnhancer:
 
         # If the question is about job search/roles and response seems incomplete
         # Add a modest closing about opportunities (not overly enthusiastic)
-        if re.search(r"(?:job|role|position|opportunity|looking for|seeking)", question, re.IGNORECASE) and not re.search(
+        if re.search(
+            r"(?:job|role|position|opportunity|looking for|seeking)", question, re.IGNORECASE
+        ) and not re.search(
             r"(?:opportunity|interview|connect|discuss|reach out|contact)", enhanced, re.IGNORECASE
         ):
-            enhanced += " For current opportunities and detailed discussions, direct contact would be best."
+            enhanced += (
+                " For current opportunities and detailed discussions, direct contact would be best."
+            )
 
         return enhanced
 
@@ -264,4 +275,3 @@ def get_response_enhancer() -> ResponseEnhancer:
         ResponseEnhancer instance
     """
     return ResponseEnhancer()
-
