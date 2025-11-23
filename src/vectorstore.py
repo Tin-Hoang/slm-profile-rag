@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import chromadb
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 

@@ -42,7 +42,9 @@ certifi==2025.11.12
 charset-normalizer==3.4.4
     # via requests
 chromadb==1.3.5
-    # via slm-profile-rag (pyproject.toml)
+    # via
+    #   slm-profile-rag (pyproject.toml)
+    #   langchain-chroma
 click==8.3.1
     # via
     #   streamlit
@@ -142,6 +144,8 @@ kubernetes==34.1.0
     # via chromadb
 langchain==1.0.8
     # via slm-profile-rag (pyproject.toml)
+langchain-chroma==1.0.0
+    # via slm-profile-rag (pyproject.toml)
 langchain-classic==1.0.0
     # via langchain-community
 langchain-community==0.4.1
@@ -150,6 +154,7 @@ langchain-core==1.1.0
     # via
     #   slm-profile-rag (pyproject.toml)
     #   langchain
+    #   langchain-chroma
     #   langchain-classic
     #   langchain-community
     #   langchain-huggingface
@@ -210,6 +215,7 @@ networkx==3.5
 numpy==2.3.5
     # via
     #   chromadb
+    #   langchain-chroma
     #   langchain-community
     #   onnxruntime
     #   pandas
