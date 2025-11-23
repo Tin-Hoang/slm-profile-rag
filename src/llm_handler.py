@@ -2,8 +2,8 @@
 
 import logging
 
-from langchain_community.llms import Ollama
 from langchain_core.language_models.base import BaseLanguageModel
+from langchain_ollama import OllamaLLM
 
 from .config_loader import get_config
 
@@ -19,11 +19,11 @@ class LLMHandler:
         self.provider = self.config.get("llm.provider", "ollama")
         self.llm: BaseLanguageModel | None = None
 
-    def get_ollama_llm(self) -> Ollama:
+    def get_ollama_llm(self) -> OllamaLLM:
         """Initialize Ollama LLM.
 
         Returns:
-            Ollama LLM instance
+            OllamaLLM instance
         """
         model = self.config.get("llm.model", "llama3.2:3b")
         temperature = self.config.get("llm.temperature", 0.7)
@@ -32,7 +32,7 @@ class LLMHandler:
         logger.info(f"Initializing Ollama with model: {model}")
 
         try:
-            llm = Ollama(
+            llm = OllamaLLM(
                 model=model,
                 temperature=temperature,
                 base_url=base_url,
