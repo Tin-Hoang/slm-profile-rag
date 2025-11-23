@@ -121,14 +121,33 @@ class VectorStoreManager:
         search_type = self.config.get("vectorstore.search_type", "similarity")
         search_kwargs = self.config.get("vectorstore.search_kwargs", {"k": 4})
 
+        # Filter search_kwargs based on search_type
+        # Only 'k' is valid for similarity search
+        # 'fetch_k' and 'lambda_mult' are only valid for MMR search
+        if search_type == "similarity":
+            # For similarity search, only keep 'k' parameter
+            filtered_kwargs = {"k": search_kwargs.get("k", 4)}
+        elif search_type == "mmr":
+            # For MMR search, keep all parameters
+            filtered_kwargs = {
+                "k": search_kwargs.get("k", 4),
+                "fetch_k": search_kwargs.get("fetch_k", 20),
+                "lambda_mult": search_kwargs.get("lambda_mult", 0.5),
+            }
+        else:
+            # Default to just k
+            filtered_kwargs = {"k": search_kwargs.get("k", 4)}
+
         # Override with provided kwargs
-        search_kwargs.update(kwargs)
+        filtered_kwargs.update(kwargs)
 
         logger.debug(
-            f"Creating retriever with search_type={search_type}, search_kwargs={search_kwargs}"
+            f"Creating retriever with search_type={search_type}, search_kwargs={filtered_kwargs}"
         )
 
-        return self.vectorstore.as_retriever(search_type=search_type, search_kwargs=search_kwargs)
+        return self.vectorstore.as_retriever(
+            search_type=search_type, search_kwargs=filtered_kwargs
+        )
 
     def add_documents(self, documents: list[Document]) -> None:
         """Add new documents to existing vector store.
