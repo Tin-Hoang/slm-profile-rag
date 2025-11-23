@@ -10,6 +10,7 @@ from langchain_core.runnables import RunnablePassthrough
 
 from .config_loader import get_config
 from .llm_handler import get_llm_handler
+from .response_enhancer import get_response_enhancer
 from .vectorstore import get_vectorstore_manager
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ class RAGPipeline:
         self.config = get_config()
         self.llm_handler = get_llm_handler()
         self.vectorstore_manager = get_vectorstore_manager()
+        self.response_enhancer = get_response_enhancer()
 
         # Load vector store
         self.vectorstore_manager.load_vectorstore()
@@ -103,6 +105,13 @@ Answer: """
             # Get the answer from the chain
             answer = self.qa_chain.invoke(question)
 
+            # Enhance the response for better tone and professionalism
+            if self.config.get("rag.enhance_responses", True):
+                original_answer = answer
+                answer = self.response_enhancer.enhance_with_context(answer, question)
+                if answer != original_answer:
+                    logger.debug("Response enhanced for better tone")
+
             # Retrieve source documents separately if needed
             source_documents = []
             if self.config.get("rag.include_sources", True):
@@ -117,7 +126,7 @@ Answer: """
         except Exception as e:
             logger.error(f"Error processing query: {e}")
             return {
-                "result": f"I apologize, but I encountered an error: {e}",
+                "result": "I encountered a technical issue. Please try rephrasing your question or reach out directly to discuss further.",
                 "source_documents": [],
             }
 

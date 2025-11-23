@@ -10,6 +10,7 @@ A RAG (Retrieval Augmented Generation) chatbot that answers questions about your
 - 🎨 **Clean UI**: Streamlit-based interface
 - ⚙️ **Highly Configurable**: YAML-based settings for easy customization
 - 🚀 **HuggingFace Spaces Ready**: Deploy with one click
+- ✨ **Smart Response Enhancement**: Automatically removes negative language and adds professional, recruiter-friendly tone
 
 ## 🏗️ Architecture
 
@@ -176,6 +177,7 @@ slm-profile-rag/
 │   ├── vectorstore.py              # ChromaDB operations
 │   ├── llm_handler.py              # Ollama/LLM interface
 │   ├── rag_pipeline.py             # RAG chain logic
+│   ├── response_enhancer.py        # Response post-processing (NEW!)
 │   ├── config_loader.py            # Load config.yaml & .env
 │   └── build_vectorstore.py        # CLI to build vector DB
 ├── chroma_db/                      # Vector database (auto-generated)

@@ -1,0 +1,199 @@
+"""Response enhancement module for improving RAG outputs."""
+
+import logging
+import re
+
+from .config_loader import get_config
+
+logger = logging.getLogger(__name__)
+
+
+class ResponseEnhancer:
+    """Enhance and polish RAG responses for better user experience."""
+
+    def __init__(self):
+        """Initialize response enhancer with configuration."""
+        self.config = get_config()
+        self.name = self.config.get("profile.name", "the candidate")
+
+        # Negative phrases to detect and rewrite
+        self.negative_patterns = [
+            (
+                r"(?:However|Unfortunately|I apologize),?\s*(?:I\s+)?don'?t\s+have\s+(?:any\s+)?(?:more\s+)?(?:specific\s+)?(?:information|details)\s+(?:about|on|regarding)\s+([^.!?]+)",
+                self._rewrite_no_info,
+            ),
+            (
+                r"(?:I\s+)?(?:don'?t|do\s+not)\s+have\s+(?:any\s+)?(?:more\s+)?(?:information|details|data)\s+(?:about|on|regarding)\s+([^.!?]+)",
+                self._rewrite_no_info,
+            ),
+            (
+                r"(?:I'm|I am)\s+(?:not\s+)?(?:un)?(?:sure|certain|aware)\s+(?:about|of)\s+([^.!?]+)",
+                self._rewrite_uncertain,
+            ),
+            (
+                r"(?:I\s+)?(?:cannot|can'?t|unable to)\s+(?:provide|share|give)\s+(?:more\s+)?(?:information|details)\s+(?:about|on)\s+([^.!?]+)",
+                self._rewrite_cannot_provide,
+            ),
+        ]
+
+        # Closing enhancements (more modest)
+        self.positive_closings = [
+            "For more details, connecting directly would be helpful.",
+            "Additional information can be discussed in a direct conversation.",
+            "Feel free to reach out for more specific information.",
+            "Direct contact would provide more comprehensive details.",
+        ]
+
+    def _rewrite_no_info(self, match: re.Match) -> str:
+        """Rewrite 'don't have information' statements.
+
+        Args:
+            match: Regex match object
+
+        Returns:
+            Rewritten positive statement
+        """
+        topic = match.group(1).strip()
+        rewrites = [
+            f"For more specific details about {topic}, it would be best to connect directly.",
+            f"The available profile focuses on other aspects of the background.",
+            f"Additional information about {topic} can be discussed in a direct conversation.",
+            f"The documented profile covers the key highlights.",
+        ]
+        # Use hash to consistently select same rewrite for same topic
+        idx = hash(topic) % len(rewrites)
+        return rewrites[idx]
+
+    def _rewrite_uncertain(self, match: re.Match) -> str:
+        """Rewrite uncertain statements.
+
+        Args:
+            match: Regex match object
+
+        Returns:
+            Rewritten confident statement
+        """
+        topic = match.group(1).strip()
+        rewrites = [
+            f"Specific details about {topic} would be best discussed directly.",
+            f"For more information about {topic}, connecting directly would be helpful.",
+            f"Details about {topic} may be available through direct conversation.",
+        ]
+        idx = hash(topic) % len(rewrites)
+        return rewrites[idx]
+
+    def _rewrite_cannot_provide(self, match: re.Match) -> str:
+        """Rewrite 'cannot provide' statements.
+
+        Args:
+            match: Regex match object
+
+        Returns:
+            Rewritten forward-looking statement
+        """
+        topic = match.group(1).strip()
+        rewrites = [
+            f"More detailed information about {topic} can be discussed directly.",
+            f"For additional context about {topic}, direct conversation would be helpful.",
+            f"Further details about {topic} are available through direct contact.",
+        ]
+        idx = hash(topic) % len(rewrites)
+        return rewrites[idx]
+
+    def _add_positive_closing(self, text: str) -> str:
+        """Add a modest closing statement if appropriate.
+
+        Args:
+            text: Response text
+
+        Returns:
+            Text with closing added if needed (only for very negative endings)
+        """
+        # Check if response already mentions connecting or reaching out
+        forward_looking_patterns = [
+            r"(?:connect|contact|reach out|discuss|conversation|directly)",
+            r"(?:feel free|available|happy|welcome)\s+to",
+        ]
+
+        for pattern in forward_looking_patterns:
+            if re.search(pattern, text, re.IGNORECASE):
+                return text  # Already has some form of closing or contact suggestion
+
+        # Only add closing for clearly negative endings
+        very_negative_ending_patterns = [
+            r"(?:however|unfortunately).*(?:don'?t|cannot|can'?t|no)[^.!?]*[.!?]\s*$",
+            r"(?:not\s+available|not\s+found|no\s+information)[^.!?]*[.!?]\s*$",
+        ]
+
+        for pattern in very_negative_ending_patterns:
+            if re.search(pattern, text, re.IGNORECASE):
+                # Add a modest closing
+                closing = self.positive_closings[hash(text) % len(self.positive_closings)]
+                return f"{text.rstrip()} {closing}"  # Single space, not double newline
+
+        return text
+
+    def enhance(self, response: str) -> str:
+        """Enhance response by removing negative language and adding positive tone.
+
+        Args:
+            response: Original response text
+
+        Returns:
+            Enhanced response text
+        """
+        if not response or len(response.strip()) == 0:
+            return response
+
+        enhanced = response
+
+        # Apply negative pattern rewrites
+        for pattern, rewrite_func in self.negative_patterns:
+            matches = list(re.finditer(pattern, enhanced, re.IGNORECASE))
+            # Process matches in reverse to maintain string positions
+            for match in reversed(matches):
+                replacement = rewrite_func(match)
+                enhanced = enhanced[: match.start()] + replacement + enhanced[match.end() :]
+                logger.debug(f"Rewrote negative phrase: '{match.group(0)}' -> '{replacement}'")
+
+        # Add positive closing if needed
+        enhanced = self._add_positive_closing(enhanced)
+
+        # Clean up any double spaces or awkward punctuation
+        enhanced = re.sub(r"\s+", " ", enhanced)
+        enhanced = re.sub(r"\s+([.,!?])", r"\1", enhanced)
+        enhanced = re.sub(r"([.!?])\s*([.!?])", r"\1", enhanced)
+
+        return enhanced.strip()
+
+    def enhance_with_context(self, response: str, question: str) -> str:
+        """Enhance response with awareness of the question context.
+
+        Args:
+            response: Original response text
+            question: Original question
+
+        Returns:
+            Context-aware enhanced response
+        """
+        enhanced = self.enhance(response)
+
+        # If the question is about job search/roles and response seems incomplete
+        # Add a modest closing about opportunities (not overly enthusiastic)
+        if re.search(r"(?:job|role|position|opportunity|looking for|seeking)", question, re.IGNORECASE):
+            if not re.search(
+                r"(?:opportunity|interview|connect|discuss|reach out|contact)", enhanced, re.IGNORECASE
+            ):
+                enhanced += " For current opportunities and detailed discussions, direct contact would be best."
+
+        return enhanced
+
+
+def get_response_enhancer() -> ResponseEnhancer:
+    """Get response enhancer instance.
+
+    Returns:
+        ResponseEnhancer instance
+    """
+    return ResponseEnhancer()
+
