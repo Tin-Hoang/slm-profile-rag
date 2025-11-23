@@ -18,13 +18,7 @@ A RAG (Retrieval Augmented Generation) chatbot that answers questions about your
 </p>
 <p align="center"><em>Overall system design showing the RAG pipeline and component interactions</em></p>
 
-```
-Documents → Document Processor → Embeddings → ChromaDB
-                                                  ↓
-                                            RAG Pipeline ← Ollama LLM
-                                                  ↓
-                                            Streamlit UI
-```
+Detailed architecture can be found in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## 🛠️ Tech Stack
 
