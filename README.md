@@ -1,6 +1,10 @@
 # 🤖 SLM Profile RAG Chatbot
 
 <p align="center">
+  <img src="docs/banner_image.png" alt="SLM Profile RAG Banner" width="100%" />
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/LangChain-🦜-121212?style=for-the-badge" alt="LangChain"/>
   <img src="https://img.shields.io/badge/ChromaDB-Vector_DB-FF6F61?style=for-the-badge" alt="ChromaDB"/>
   <img src="https://img.shields.io/badge/Ollama-🦙-000000?style=for-the-badge" alt="Ollama"/>
