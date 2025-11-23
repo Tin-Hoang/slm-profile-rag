@@ -195,12 +195,27 @@ class DocumentProcessor:
             logger.error(f"Directory not found: {directory}")
             return []
 
+        # Get main document path to exclude it from vector store
+        main_doc_path = self.config.get("main_document.path", "")
+        main_doc_file = Path(main_doc_path).resolve() if main_doc_path else None
+
         all_documents = []
+        skipped_main_doc = False
 
         # Find all supported files
         for ext in self.supported_extensions:
             files = list(directory.rglob(f"*{ext}"))
             for file_path in files:
+                # Skip main document file - it's loaded directly, not chunked
+                if main_doc_file and file_path.resolve() == main_doc_file:
+                    if not skipped_main_doc:
+                        logger.info(
+                            f"Skipping main document: {file_path.name} "
+                            "(loaded directly, not stored in vector DB)"
+                        )
+                        skipped_main_doc = True
+                    continue
+
                 logger.info(f"Processing {file_path.name}...")
                 docs = self.load_document(file_path)
                 all_documents.extend(docs)

@@ -32,6 +32,15 @@ def build_vectorstore(documents_dir: str | None = None, force_rebuild: bool = Fa
     if documents_dir is None:
         documents_dir = config.get_env("DOCUMENTS_DIR", "./data/documents")
 
+    # Log main document info
+    main_doc_enabled = config.get("main_document.enabled", False)
+    main_doc_path = config.get("main_document.path", "")
+    if main_doc_enabled and main_doc_path:
+        logger.info(f"Main Document Feature: ENABLED")
+        logger.info(f"  Main document ({Path(main_doc_path).name}) will be excluded from vector store")
+        logger.info(f"  (It's loaded directly into prompts, not retrieved)")
+        logger.info("")
+
     documents_path = Path(documents_dir)
 
     if not documents_path.exists():
@@ -76,6 +85,11 @@ def build_vectorstore(documents_dir: str | None = None, force_rebuild: bool = Fa
         logger.info(f"   Location: {vectorstore_manager.persist_directory}")
         logger.info(f"   Collection: {vectorstore_manager.collection_name}")
         logger.info(f"   Documents: {len(documents)} chunks")
+
+        # Log main document status
+        if main_doc_enabled and main_doc_path:
+            logger.info(f"   Main Doc: {Path(main_doc_path).name} (loaded directly)")
+
         logger.info("=" * 60)
         logger.info("\n🚀 You can now run the chatbot with: streamlit run app.py\n")
 
