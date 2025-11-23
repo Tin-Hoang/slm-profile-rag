@@ -7,7 +7,8 @@ font = "sans serif"
 
 [server]
 headless = true
-port = 7860
+# port = 8501  # Default Streamlit port (for local dev)
+# Note: HuggingFace Spaces overrides this to 7860 via Dockerfile
 enableCORS = false
 enableXsrfProtection = true
 
