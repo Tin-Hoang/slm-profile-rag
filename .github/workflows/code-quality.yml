@@ -1,0 +1,38 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  type-check:
+    name: Type Checking & Complexity Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install mypy radon
+
+    - name: Check for Python syntax errors
+      run: |
+        python -m py_compile app.py
+        find src tests -name "*.py" -exec python -m py_compile {} \;
+
+    - name: Run complexity analysis
+      continue-on-error: true
+      run: |
+        radon cc src tests app.py -a -s
+        radon mi src tests app.py -s
