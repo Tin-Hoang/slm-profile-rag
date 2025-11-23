@@ -5,9 +5,9 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 from docx import Document as DocxDocument
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from .config_loader import get_config
 
