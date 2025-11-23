@@ -157,18 +157,12 @@ Detailed architecture can be found in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 3. **Open browser**: Navigate to `http://localhost:8501`
 
-### Linting & Formatting
+**Screenshot Example:**
 
-```bash
-# Check code
-uv run ruff check .
-
-# Format code
-uv run ruff format .
-
-# Check and fix
-uv run ruff check --fix .
-```
+<p align="center">
+  <img src="docs/screenshot-example.png" alt="SLM Profile RAG UI Example" width="800" />
+</p>
+<p align="center"><em>Streamlit chatbot interface in action</em></p>
 
 ## 🌐 Deployment to Hugging Face Spaces
 
