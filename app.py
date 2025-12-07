@@ -11,7 +11,15 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).parent))
 
 from src.config_loader import get_config
-from src.rag_pipeline import get_rag_pipeline
+from src.llm_handler import (
+    detect_default_provider,
+    get_available_groq_models,
+    get_available_ollama_models,
+    get_default_groq_model,
+    get_default_ollama_model,
+    get_llm_handler,
+)
+from src.rag_pipeline import RAGPipeline
 
 # Configure logging
 logging.basicConfig(
@@ -34,6 +42,19 @@ def init_session_state():
     if "pending_question" not in st.session_state:
         st.session_state.pending_question = None
 
+    # LLM Provider settings
+    if "llm_provider" not in st.session_state:
+        st.session_state.llm_provider = detect_default_provider()
+
+    if "groq_api_key" not in st.session_state:
+        st.session_state.groq_api_key = ""
+
+    if "groq_model" not in st.session_state:
+        st.session_state.groq_model = get_default_groq_model()
+
+    if "ollama_model" not in st.session_state:
+        st.session_state.ollama_model = get_default_ollama_model()
+
 
 def load_config():
     """Load configuration."""
@@ -46,13 +67,35 @@ def load_config():
             st.stop()
 
 
-def load_rag_pipeline():
-    """Load RAG pipeline."""
-    if st.session_state.rag_pipeline is None:
+def load_rag_pipeline(force_reload: bool = False):
+    """Load RAG pipeline with current provider settings.
+
+    Args:
+        force_reload: Force reload even if pipeline exists
+    """
+    if st.session_state.rag_pipeline is None or force_reload:
         with st.spinner("Loading RAG pipeline... This may take a moment."):
             try:
-                st.session_state.rag_pipeline = get_rag_pipeline()
-                logger.info("RAG pipeline loaded successfully")
+                # Get provider settings from session state
+                provider = st.session_state.llm_provider
+                api_key = st.session_state.groq_api_key or None
+                model = None
+
+                if provider == "groq":
+                    model = st.session_state.groq_model
+                elif provider == "ollama":
+                    model = st.session_state.ollama_model
+
+                # Create LLM handler with overrides
+                llm_handler = get_llm_handler(
+                    provider_override=provider,
+                    api_key_override=api_key,
+                    model_override=model,
+                )
+
+                st.session_state.rag_pipeline = RAGPipeline(llm_handler=llm_handler)
+                logger.info(f"RAG pipeline loaded with provider: {provider}")
+
             except FileNotFoundError:
                 st.error(
                     "❌ Vector store not found! Please build it first:\n\n"
@@ -67,14 +110,70 @@ def load_rag_pipeline():
                     "3. Started Ollama and pulled the model"
                 )
                 st.stop()
+
             except Exception as e:
+                error_str = str(e).lower()
+
+                # Check if it's a Groq API error - try fallback to Ollama
+                if st.session_state.llm_provider == "groq" and (
+                    "401" in error_str
+                    or "invalid" in error_str
+                    or "api_key" in error_str
+                    or "429" in error_str
+                    or "rate" in error_str
+                ):
+                    logger.warning(f"Groq API error: {e}. Falling back to Ollama.")
+
+                    # Show warning to user
+                    st.warning(
+                        "⚠️ **Groq API Error** - Falling back to Ollama\n\n"
+                        "Possible causes:\n"
+                        "- Invalid API key\n"
+                        "- Rate limit exceeded (free tier cap)\n"
+                        "- API key expired\n\n"
+                        "**Get a new key at:** https://console.groq.com\n\n"
+                        "Using local Ollama instead..."
+                    )
+
+                    # Fallback to Ollama
+                    try:
+                        st.session_state.llm_provider = "ollama"
+                        ollama_model = st.session_state.ollama_model or get_default_ollama_model()
+
+                        llm_handler = get_llm_handler(
+                            provider_override="ollama",
+                            model_override=ollama_model,
+                        )
+
+                        st.session_state.rag_pipeline = RAGPipeline(llm_handler=llm_handler)
+                        logger.info("Fallback to Ollama successful")
+                        st.success(f"✅ Now using Ollama with model: {ollama_model}")
+                        return
+
+                    except Exception as fallback_error:
+                        st.error(f"Fallback to Ollama also failed: {fallback_error}")
+                        st.info(
+                            "Make sure Ollama is running:\n"
+                            "- Start Ollama: `ollama serve`\n"
+                            "- Pull a model: `ollama pull llama3.2:3b`"
+                        )
+                        logger.error(f"Ollama fallback error: {fallback_error}")
+                        st.stop()
+
+                # Not a Groq error or other error
                 st.error(f"Error loading RAG pipeline: {e}")
-                st.info(
-                    "Common issues:\n"
-                    "- Ollama not running: `ollama serve`\n"
-                    "- Model not pulled: `ollama pull llama3.2:3b`\n"
-                    "- Check your config.yaml settings"
-                )
+                if st.session_state.llm_provider == "groq":
+                    st.info(
+                        "Groq issues:\n"
+                        "- Check your API key is valid\n"
+                        "- Get a free key at https://console.groq.com"
+                    )
+                else:
+                    st.info(
+                        "Ollama issues:\n"
+                        "- Ollama not running: `ollama serve`\n"
+                        "- Model not pulled: `ollama pull llama3.2:3b`"
+                    )
                 logger.error(f"RAG pipeline error: {e}", exc_info=True)
                 st.stop()
 
@@ -134,12 +233,101 @@ def display_sidebar():
 
         st.divider()
 
-        # Model info
-        st.subheader("🤖 Model Info")
-        model = config.get("llm.model", "Unknown")
-        provider = config.get("llm.provider", "Unknown")
-        st.markdown(f"**Provider:** {provider}")
-        st.markdown(f"**Model:** {model}")
+        # LLM Provider Selection
+        st.subheader("🤖 LLM Provider")
+
+        # Provider selector
+        providers = ["ollama", "groq"]
+        current_provider_idx = (
+            providers.index(st.session_state.llm_provider)
+            if st.session_state.llm_provider in providers
+            else 0
+        )
+
+        new_provider = st.radio(
+            "Select Provider",
+            providers,
+            index=current_provider_idx,
+            format_func=lambda x: "🦙 Ollama (Local)" if x == "ollama" else "⚡ Groq (Cloud)",
+            key="provider_radio",
+            help="Ollama runs locally. Groq requires an API key but is faster.",
+        )
+
+        # Groq-specific settings
+        if new_provider == "groq":
+            st.markdown("---")
+            groq_key = st.text_input(
+                "Groq API Key",
+                value=st.session_state.groq_api_key,
+                type="password",
+                placeholder="Enter your Groq API key",
+                help="Get a free key at https://console.groq.com",
+                key="groq_key_input",
+            )
+
+            groq_models = get_available_groq_models()
+            current_model_idx = (
+                groq_models.index(st.session_state.groq_model)
+                if st.session_state.groq_model in groq_models
+                else 0
+            )
+
+            new_model = st.selectbox(
+                "Groq Model",
+                groq_models,
+                index=current_model_idx,
+                key="groq_model_select",
+            )
+
+            # Check if settings changed
+            settings_changed = (
+                new_provider != st.session_state.llm_provider
+                or groq_key != st.session_state.groq_api_key
+                or new_model != st.session_state.groq_model
+            )
+
+            if settings_changed and st.button("🔄 Apply Changes", type="primary"):
+                st.session_state.llm_provider = new_provider
+                st.session_state.groq_api_key = groq_key
+                st.session_state.groq_model = new_model
+                st.session_state.rag_pipeline = None  # Force reload
+                st.rerun()
+        else:
+            # Ollama selected - show model selector
+            st.markdown("---")
+            ollama_models = get_available_ollama_models()
+            current_ollama_idx = (
+                ollama_models.index(st.session_state.ollama_model)
+                if st.session_state.ollama_model in ollama_models
+                else 0
+            )
+
+            new_ollama_model = st.selectbox(
+                "Ollama Model",
+                ollama_models,
+                index=current_ollama_idx,
+                key="ollama_model_select",
+                help="Make sure the model is pulled: ollama pull <model>",
+            )
+
+            settings_changed = (
+                new_provider != st.session_state.llm_provider
+                or new_ollama_model != st.session_state.ollama_model
+            )
+
+            if settings_changed and st.button("🔄 Apply Changes", type="primary"):
+                st.session_state.llm_provider = new_provider
+                st.session_state.ollama_model = new_ollama_model
+                st.session_state.rag_pipeline = None
+                st.rerun()
+
+        # Show current active settings
+        st.markdown("---")
+        st.caption(f"**Active:** {st.session_state.llm_provider.upper()}")
+        if st.session_state.llm_provider == "groq":
+            st.caption(f"**Model:** {st.session_state.groq_model}")
+        else:
+            st.caption(f"**Model:** {st.session_state.ollama_model}")
 
         st.divider()
 
@@ -149,7 +337,7 @@ def display_sidebar():
             st.rerun()
 
         # Settings
-        with st.expander("⚙️ Settings"):
+        with st.expander("⚙️ Advanced Settings"):
             st.markdown("**Vector Store**")
             st.markdown(f"- Collection: {config.get('vectorstore.collection_name', 'N/A')}")
             st.markdown(f"- Top K: {config.get('vectorstore.search_kwargs.k', 'N/A')}")

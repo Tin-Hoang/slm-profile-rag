@@ -8,8 +8,9 @@ profile:
 
 # LLM Configuration
 llm:
-  provider: "ollama"  # Options: ollama, openai, anthropic, groq
+  provider: "ollama"  # Options: ollama, groq (auto-detected if GROQ_API_KEY is set)
   model: "llama3.2:3b"  # For Ollama. Other options: phi3:mini, gemma2:2b
+  groq_model: "llama-3.3-70b-versatile"  # For Groq. Options: llama-3.1-8b-instant, mixtral-8x7b-32768, gemma2-9b-it
   temperature: 0.7
   max_tokens: 800  # Increased for better-formatted, complete responses
   top_p: 0.9

@@ -21,10 +21,14 @@ logger = logging.getLogger(__name__)
 class RAGPipeline:
     """RAG pipeline for question answering."""
 
-    def __init__(self):
-        """Initialize RAG pipeline."""
+    def __init__(self, llm_handler=None):
+        """Initialize RAG pipeline.
+
+        Args:
+            llm_handler: Optional LLMHandler instance for custom provider/model
+        """
         self.config = get_config()
-        self.llm_handler = get_llm_handler()
+        self.llm_handler = llm_handler or get_llm_handler()
         self.vectorstore_manager = get_vectorstore_manager()
         self.response_enhancer = get_response_enhancer()
         self.main_doc_loader = get_main_document_loader()
