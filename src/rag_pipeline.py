@@ -1,6 +1,7 @@
 """RAG pipeline for retrieval-augmented generation."""
 
 import logging
+from collections.abc import Iterator
 from typing import Any
 
 from langchain_core.documents import Document
@@ -196,6 +197,49 @@ Answer: """
         answer = response.get("result", "I couldn't generate an answer.")
         sources = response.get("source_documents", [])
         return answer, sources
+
+    def stream_query(self, question: str) -> Iterator[str]:
+        """Stream the response token by token.
+
+        Args:
+            question: User question
+
+        Yields:
+            Response chunks as they are generated
+        """
+        logger.info(f"Streaming query: {question}")
+
+        try:
+            # Stream the response using LCEL's stream method
+            yield from self.qa_chain.stream(question)
+
+        except Exception as e:
+            logger.error(f"Error streaming query: {e}")
+            yield "I encountered a technical issue. Please try rephrasing your question."
+
+    def stream_answer(self, question: str) -> Iterator[str]:
+        """Stream answer to a question (simplified interface).
+
+        Args:
+            question: User question
+
+        Yields:
+            Answer chunks as they are generated
+        """
+        yield from self.stream_query(question)
+
+    def get_source_documents(self, question: str) -> list[Document]:
+        """Get source documents for a question (can run in parallel with streaming).
+
+        Args:
+            question: User question
+
+        Returns:
+            List of source documents
+        """
+        if self.config.get("rag.include_sources", True):
+            return self.retriever.invoke(question)
+        return []
 
     def format_sources(self, sources: list[Document]) -> str:
         """Format source documents for display.

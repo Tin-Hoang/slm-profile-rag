@@ -197,16 +197,37 @@ def process_user_input(prompt: str):
         if config.get("ui.show_timestamps", True):
             st.caption(f"_{timestamp}_")
 
-    # Generate response
-    with st.chat_message("assistant"), st.spinner("Thinking..."):
+    # Generate streaming response
+    with st.chat_message("assistant"):
         try:
-            # Get answer with sources
-            answer, sources = rag_pipeline.get_answer_with_sources(prompt)
+            # Create placeholder for streaming content
+            response_placeholder = st.empty()
 
-            # Display answer
-            st.markdown(answer)
+            # Stream the response token by token with spinner
+            streamed_content = ""
+            with st.spinner("Thinking (this may take a few minutes on a free-tier HF space)..."):
+                for chunk in rag_pipeline.stream_answer(prompt):
+                    streamed_content += chunk
+                    response_placeholder.markdown(streamed_content + "▌")
 
-            # Format and display sources
+            # Remove cursor and show final streamed content
+            response_placeholder.markdown(streamed_content)
+
+            # Enhance the response for better tone (post-stream enhancement)
+            answer = streamed_content
+            if config.get("rag.enhance_responses", True):
+                from src.response_enhancer import get_response_enhancer
+
+                enhancer = get_response_enhancer()
+                enhanced_answer = enhancer.enhance_with_context(streamed_content, prompt)
+                if enhanced_answer != streamed_content:
+                    answer = enhanced_answer
+                    # Update display with enhanced version
+                    response_placeholder.markdown(answer)
+                    logger.debug("Response enhanced for better tone")
+
+            # Get source documents (after streaming completes)
+            sources = rag_pipeline.get_source_documents(prompt)
             sources_text = ""
             if config.get("rag.include_sources", True) and sources:
                 sources_text = rag_pipeline.format_sources(sources)
