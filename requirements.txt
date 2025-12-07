@@ -12,6 +12,7 @@ annotated-types==0.7.0
     # via pydantic
 anyio==4.11.0
     # via
+    #   groq
     #   httpx
     #   watchfiles
 attrs==25.4.0
@@ -55,7 +56,9 @@ coloredlogs==15.0.1
 dataclasses-json==0.6.7
     # via langchain-community
 distro==1.9.0
-    # via posthog
+    # via
+    #   groq
+    #   posthog
 durationpy==0.10
     # via kubernetes
 filelock==3.20.0
@@ -83,6 +86,8 @@ googleapis-common-protos==1.72.0
     # via opentelemetry-exporter-otlp-proto-grpc
 greenlet==3.2.4
     # via sqlalchemy
+groq==0.37.1
+    # via langchain-groq
 grpcio==1.76.0
     # via
     #   chromadb
@@ -100,6 +105,7 @@ httptools==0.7.1
 httpx==0.28.1
     # via
     #   chromadb
+    #   groq
     #   langgraph-sdk
     #   langsmith
     #   ollama
@@ -157,12 +163,15 @@ langchain-core==1.1.0
     #   langchain-chroma
     #   langchain-classic
     #   langchain-community
+    #   langchain-groq
     #   langchain-huggingface
     #   langchain-ollama
     #   langchain-text-splitters
     #   langgraph
     #   langgraph-checkpoint
     #   langgraph-prebuilt
+langchain-groq==1.1.0
+    # via slm-profile-rag (pyproject.toml)
 langchain-huggingface==1.0.1
     # via slm-profile-rag (pyproject.toml)
 langchain-ollama==1.0.0
@@ -303,6 +312,7 @@ pybase64==1.4.2
 pydantic==2.12.4
     # via
     #   chromadb
+    #   groq
     #   langchain
     #   langchain-classic
     #   langchain-core
@@ -394,6 +404,8 @@ scipy==1.16.3
     #   sentence-transformers
 sentence-transformers==5.1.2
     # via slm-profile-rag (pyproject.toml)
+setuptools==80.9.0
+    # via torch
 shellingham==1.5.4
     # via typer
 six==1.17.0
@@ -404,7 +416,9 @@ six==1.17.0
 smmap==5.0.2
     # via gitdb
 sniffio==1.3.1
-    # via anyio
+    # via
+    #   anyio
+    #   groq
 soupsieve==2.8
     # via beautifulsoup4
 sqlalchemy==2.0.44
@@ -455,6 +469,7 @@ typing-extensions==4.15.0
     #   anyio
     #   beautifulsoup4
     #   chromadb
+    #   groq
     #   grpcio
     #   huggingface-hub
     #   langchain-core
