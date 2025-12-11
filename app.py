@@ -1,6 +1,7 @@
 """Streamlit app for LLM Profile Chatbot."""
 
 import logging
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -26,6 +27,12 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+# Log LangSmith tracing status
+if os.getenv("LANGCHAIN_TRACING_V2", "").lower() == "true":
+    logger.info(
+        f"LangSmith tracing enabled for project: {os.getenv('LANGCHAIN_PROJECT', 'slm-profile-rag')}"
+    )
 
 
 def init_session_state():

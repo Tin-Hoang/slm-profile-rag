@@ -249,6 +249,33 @@ slm-profile-rag/
 | `gemma2:2b` | 2B | Very Fast | Decent | Free ✅ |
 | `llama3.1:8b` | 8B | Medium | Great | Upgraded GPU |
 
+## 🔍 LLM Tracing with LangSmith
+
+Monitor prompts, responses, and latency using [LangSmith](https://smith.langchain.com).
+
+### Setup
+
+1. **Get API Key**: Sign up at [smith.langchain.com](https://smith.langchain.com) (free tier: 5,000 traces/month)
+
+2. **Configure `.env`**:
+   ```bash
+   LANGCHAIN_TRACING_V2=true
+   LANGCHAIN_API_KEY=your_api_key_here
+   LANGCHAIN_PROJECT=slm-profile-rag
+   ```
+
+3. **Restart the app**:
+   ```bash
+   streamlit run app.py
+   ```
+
+### What You Can See
+
+- Full prompts sent to LLM (system prompt + context + question)
+- Complete LLM responses
+- Latency breakdown per step
+- Token usage (when available)
+
 ## 🔧 Troubleshooting
 
 ### Ollama Connection Issues
