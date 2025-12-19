@@ -29,8 +29,9 @@ uv.lock
 *.log
 logs/
 
-# Vector database (will be built in container)
+# Vector database and indexes (will be built in container)
 chroma_db/
+bm25_index/
 
 # Testing
 .pytest_cache/

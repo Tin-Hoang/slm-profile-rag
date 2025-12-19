@@ -1,0 +1,91 @@
+version: "3.8"
+
+services:
+  # Ollama LLM Service
+  ollama:
+    image: ollama/ollama:latest
+    container_name: slm-rag-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+
+  # Model Initialization (pulls the model on first run)
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: slm-rag-ollama-pull
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - OLLAMA_HOST=ollama
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Pulling model: $${OLLAMA_MODEL}..."
+        ollama pull $${OLLAMA_MODEL}
+        echo "Model pulled successfully!"
+    restart: "no"
+
+  # Streamlit RAG Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: slm-rag-app
+    restart: unless-stopped
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./data/documents:/app/data/documents:ro
+      - chroma_db:/app/chroma_db
+      - bm25_index:/app/bm25_index
+      - ./config.yaml:/app/config.yaml:ro
+    environment:
+      # Ollama configuration (uses the ollama service)
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
+      # Optional: Groq API for cloud LLM (comment out OLLAMA vars to use)
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      # Streamlit settings
+      - STREAMLIT_SERVER_PORT=7860
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+      - STREAMLIT_SERVER_HEADLESS=true
+      - STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+    depends_on:
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  ollama_data:
+    name: slm-rag-ollama-data
+  chroma_db:
+    name: slm-rag-chroma-db
+  bm25_index:
+    name: slm-rag-bm25-index
+
+networks:
+  default:
+    name: slm-rag-network
