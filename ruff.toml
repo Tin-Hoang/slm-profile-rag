@@ -26,6 +26,12 @@ ignore = [
 
 [lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Allow unused imports
+"tests/**/*.py" = [
+    "ARG001",  # Unused function argument (common for fixtures)
+    "ARG002",  # Unused method argument (common for fixtures)
+    "F841",    # Unused local variable (common for side-effect calls)
+    "SIM117",  # Nested with statements (more readable in tests)
+]
 
 [format]
 quote-style = "double"
