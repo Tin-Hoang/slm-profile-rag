@@ -5,13 +5,16 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/LangChain-🦜-121212?style=for-the-badge" alt="LangChain"/>
-  <img src="https://img.shields.io/badge/ChromaDB-Vector_DB-FF6F61?style=for-the-badge" alt="ChromaDB"/>
-  <img src="https://img.shields.io/badge/Ollama-🦙-000000?style=for-the-badge" alt="Ollama"/>
-  <img src="https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white" alt="Streamlit"/>
-  <img src="https://img.shields.io/badge/HuggingFace-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black" alt="HuggingFace"/>
-  <img src="https://img.shields.io/badge/Ruff-D7FF64?style=for-the-badge&logo=ruff&logoColor=black" alt="Ruff"/>
-  <img src="https://img.shields.io/badge/UV-DE5FE9?style=for-the-badge&logo=astral&logoColor=white" alt="UV"/>
+  <img src="https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/test-python310.yml/badge.svg" alt="Python 3.10"/>
+  <img src="https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/test-python311.yml/badge.svg" alt="Python 3.11"/>
+  <img src="https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/test-python312.yml/badge.svg" alt="Python 3.12"/>
+  <img src="https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/test-docker.yml/badge.svg" alt="Docker"/>
+  <img src="https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/lint.yml/badge.svg" alt="Lint"/>
+  <img src="https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/code-quality.yml/badge.svg" alt="Code Quality"/>
+  <img src="https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/security-scan.yml/badge.svg" alt="Security Scan"/>
+  <a href="https://codecov.io/gh/Tin-Hoang/slm-profile-rag">
+    <img src="https://codecov.io/gh/Tin-Hoang/slm-profile-rag/graph/badge.svg?token=MW4RD9R66J" alt="Codecov"/>
+  </a>
 </p>
 
 A RAG (Retrieval Augmented Generation) chatbot that answers questions about your professional profile using your resume, project reports, and other documents.

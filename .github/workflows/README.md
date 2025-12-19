@@ -2,29 +2,42 @@
 
 This directory contains automated CI/CD workflows for the SLM Profile RAG project.
 
-![Tests](https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/tests.yml/badge.svg)
+![Python 3.10](https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/test-python310.yml/badge.svg)
+![Python 3.11](https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/test-python311.yml/badge.svg)
+![Python 3.12](https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/test-python312.yml/badge.svg)
+![Docker](https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/test-docker.yml/badge.svg)
 ![Lint](https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/lint.yml/badge.svg)
 ![Code Quality](https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/code-quality.yml/badge.svg)
 ![Security Scan](https://github.com/Tin-Hoang/slm-profile-rag/actions/workflows/security-scan.yml/badge.svg)
-[![codecov](https://codecov.io/gh/Tin-Hoang/slm-profile-rag/branch/main/graph/badge.svg)](https://codecov.io/gh/Tin-Hoang/slm-profile-rag)
+[![codecov](https://codecov.io/gh/Tin-Hoang/slm-profile-rag/graph/badge.svg?token=MW4RD9R66J)](https://codecov.io/gh/Tin-Hoang/slm-profile-rag)
 
 ## Workflows Overview
 
-### 🧪 tests.yml - Unit Tests
+### 🧪 test-python3XX.yml - Unit Tests per Python Version
 **Triggers:** Push/PR to main, master, develop branches; Manual dispatch
 
-**Purpose:** Runs comprehensive unit tests across multiple Python versions
+**Purpose:** Runs comprehensive unit tests for specific Python version (separate badges!)
+
+**Workflows:**
+- **test-python310.yml**: Tests on Python 3.10
+- **test-python311.yml**: Tests on Python 3.11 (includes Codecov upload)
+- **test-python312.yml**: Tests on Python 3.12
+
+**Implementation:**
+- Each workflow calls `test-python-reusable.yml` (DRY principle)
+- Installs dependencies
+- Runs ruff linting and formatting checks
+- Executes pytest with coverage reporting
+- Provides separate badge per Python version
+
+### 🐳 test-docker.yml - Docker Build Test
+**Triggers:** Push/PR to main, master, develop branches; Manual dispatch
+
+**Purpose:** Validates Docker image build
 
 **Jobs:**
-- **test**: Runs pytest with coverage on Python 3.10, 3.11, and 3.12
-  - Installs dependencies
-  - Runs ruff linting and formatting checks
-  - Executes pytest with coverage reporting
-  - Uploads coverage to Codecov (Python 3.11 only)
-
-- **test-docker**: Validates Docker image build
-  - Builds Docker image to ensure Dockerfile is valid
-  - Uses caching for faster builds
+- Builds Docker image to ensure Dockerfile is valid
+- Uses caching for faster builds
 
 ### 🔍 lint.yml - Linting (Existing)
 **Triggers:** Push/PR to main, develop branches
@@ -140,10 +153,13 @@ pip-audit
 
 | Workflow | Python Versions | OS | Caching | Coverage |
 |----------|----------------|-----|---------|----------|
-| tests.yml | 3.10, 3.11, 3.12 | Ubuntu | ✅ pip | ✅ Codecov |
+| test-python310.yml | 3.10 | Ubuntu | ✅ pip | ❌ |
+| test-python311.yml | 3.11 | Ubuntu | ✅ pip | ✅ Codecov |
+| test-python312.yml | 3.12 | Ubuntu | ✅ pip | ❌ |
+| test-docker.yml | N/A | Ubuntu | ✅ Docker | ❌ |
 | lint.yml | 3.11 | Ubuntu | ✅ UV | ❌ |
 | code-quality.yml | 3.11 | Ubuntu | ✅ pip | ❌ |
-| pre-commit.yml | 3.11 | Ubuntu | ❌ | ❌ |
+| pre-commit.yml | 3.11 | Ubuntu | ✅ pre-commit | ❌ |
 | security-scan.yml | 3.11 | Ubuntu | ✅ pip | ❌ |
 
 ## Troubleshooting
