@@ -19,7 +19,8 @@ A RAG (Retrieval Augmented Generation) chatbot that answers questions about your
 ## ✨ Features
 
 - 📄 **Multi-format Support**: Process PDF, Word, HTML, and text documents
-- 🧠 **RAG Pipeline**: Semantic search with vector database (ChromaDB)
+- 🔍 **Hybrid Search**: Combines BM25 (keyword) + Vector (semantic) search with Reciprocal Rank Fusion
+- 🧠 **Extensible Retrieval**: Pluggable strategy system - easily add new retrieval methods (PageIndex, GraphRAG, etc.)
 - 📌 **Main Document Support**: Guaranteed context - critical information always available, auto-format detection
 - 🦙 **Ollama Integration**: Run small language models locally
 - 🎨 **Clean UI**: Streamlit-based interface
@@ -41,6 +42,7 @@ Detailed architecture can be found in [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Python 3.10+** with UV package manager
 - **LangChain** for RAG pipeline
 - **ChromaDB** for vector storage
+- **rank-bm25** for lexical search
 - **Ollama** for local LLM serving
 - **Streamlit** for web interface
 - **sentence-transformers** for embeddings
@@ -145,9 +147,15 @@ Detailed architecture can be found in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ### Local Development
 
-1. **Process documents and build vector database**:
+1. **Build the retrieval index** (default: hybrid BM25 + Vector):
    ```bash
+   # Build with default strategy from config (bm25_vector)
    python -m src.build_vectorstore
+
+   # Or specify a strategy explicitly
+   python -m src.build_vectorstore --strategy bm25_vector  # Hybrid (recommended)
+   python -m src.build_vectorstore --strategy vector       # Vector-only
+   python -m src.build_vectorstore --strategy bm25         # BM25-only
    ```
 
 2. **Run the Streamlit app**:
@@ -203,6 +211,25 @@ llm:
   model: "llama3.2:3b"  # Choose your model
   temperature: 0.7
 
+# Retrieval Strategy Configuration
+retrieval:
+  strategy: "bm25_vector"  # Options: vector, bm25, bm25_vector
+  final_k: 4               # Number of documents to return
+
+  vector:
+    search_type: "similarity"
+    k: 10                  # Docs to retrieve before fusion
+
+  bm25:
+    k: 10                  # Docs to retrieve before fusion
+    tokenizer: "simple"
+
+  fusion:
+    algorithm: "rrf"       # Reciprocal Rank Fusion
+    weights:
+      vector: 0.7          # 70% weight on semantic search
+      bm25: 0.3            # 30% weight on keyword search
+
 document_processing:
   chunk_size: 1000
   chunk_overlap: 200
@@ -232,11 +259,23 @@ slm-profile-rag/
 │   ├── vectorstore.py              # ChromaDB operations
 │   ├── llm_handler.py              # Ollama/LLM interface
 │   ├── rag_pipeline.py             # RAG chain logic
-│   ├── main_document_loader.py     # Main document management (NEW!)
+│   ├── main_document_loader.py     # Main document management
 │   ├── response_enhancer.py        # Response post-processing
 │   ├── config_loader.py            # Load config.yaml & .env
-│   └── build_vectorstore.py        # CLI to build vector DB
+│   ├── build_vectorstore.py        # CLI to build indexes
+│   └── retrieval/                  # Extensible retrieval system
+│       ├── __init__.py
+│       ├── base.py                 # BaseRetrieverStrategy ABC
+│       ├── factory.py              # RetrieverFactory
+│       ├── fusion.py               # RRF and fusion algorithms
+│       ├── stores/
+│       │   └── bm25_store.py       # BM25 index storage
+│       └── strategies/
+│           ├── vector.py           # Vector-only strategy
+│           ├── bm25.py             # BM25-only strategy
+│           └── bm25_vector.py      # Hybrid BM25+Vector strategy
 ├── chroma_db/                      # Vector database (auto-generated)
+├── bm25_index/                     # BM25 index (auto-generated)
 └── tests/                          # Unit tests
 ```
 
@@ -287,11 +326,11 @@ ollama list
 ollama serve
 ```
 
-### ChromaDB Errors
+### ChromaDB / Index Errors
 ```bash
-# Rebuild vector database
-rm -rf chroma_db/
-python -m src.build_vectorstore
+# Rebuild all indexes from scratch
+rm -rf chroma_db/ bm25_index/
+python -m src.build_vectorstore --force-rebuild
 ```
 
 ### HuggingFace Spaces Issues

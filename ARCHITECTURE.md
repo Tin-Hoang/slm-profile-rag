@@ -97,16 +97,25 @@
 ### 1️⃣ Indexing Phase (One-time Setup)
 
 ```
-Documents → Load → Chunk → Embed → Store in ChromaDB
-   ↓          ↓       ↓       ↓           ↓
-resume.pdf  PyPDF  Split   HF-     Vector Database
-linkedin.html BS4   into    Embed   (Persistent)
-projects.docx docx  chunks  Model
+Documents → Load → Chunk → Build Indexes
+   ↓          ↓       ↓           ↓
+resume.pdf  PyPDF  Split    ┌─────────────────────────────┐
+linkedin.html BS4   into    │  BM25 Index (keyword)       │
+projects.docx docx  chunks  │  ./bm25_index/              │
+                            ├─────────────────────────────┤
+                            │  Vector Index (semantic)    │
+                            │  ./chroma_db/ (ChromaDB)    │
+                            └─────────────────────────────┘
 ```
 
 **Command:** `python -m src.build_vectorstore`
 
-### 2️⃣ Query Phase (Runtime) - WITH MAIN DOCUMENT
+**Strategy Options:**
+- `--strategy bm25_vector` - Build both indexes (default, recommended)
+- `--strategy vector` - Vector index only
+- `--strategy bm25` - BM25 index only
+
+### 2️⃣ Query Phase (Runtime) - WITH HYBRID SEARCH
 
 ```
 User Question
@@ -121,26 +130,34 @@ User Question
              ↓
       [Main Doc Content]
              │
-             ├─────────────────────┐
-             ↓                     ↓
-Embed Question            Main Doc (Priority)
-     ↓                           ↓
-Similarity Search        [Always Available]
-     ↓                           ↓
-Retrieve Chunks          [10k tokens max]
-     ↓                           ↓
-[VectorDB Context]    ──────────┼──────────
-             │                   │
-             └─────────┬─────────┘
-                       ↓
-              Construct Prompt:
-   System Prompt + Main Doc + VectorDB Context + Question
-                       ↓
-              Send to Ollama LLM
-                       ↓
-              Generate Answer
-                       ↓
-         Display in Streamlit UI (with source citations)
+             ├─────────────────────────────────────┐
+             ↓                                     ↓
+┌─────────────────────────────────────┐    Main Doc (Priority)
+│      Hybrid Retrieval Strategy       │          ↓
+│                                      │   [Always Available]
+│  ┌─────────────┐  ┌─────────────┐   │   [10k tokens max]
+│  │   BM25      │  │   Vector    │   │
+│  │  (keyword)  │  │ (semantic)  │   │
+│  └──────┬──────┘  └──────┬──────┘   │
+│         │                │          │
+│         └───────┬────────┘          │
+│                 ↓                   │
+│    Reciprocal Rank Fusion (RRF)     │
+│         (70% vector, 30% BM25)      │
+└────────────────┬────────────────────┘
+                 ↓
+         [Retrieved Context]
+                 │
+                 └─────────┬───────────────────┘
+                           ↓
+                  Construct Prompt:
+       System Prompt + Main Doc + Retrieved Context + Question
+                           ↓
+                  Send to Ollama LLM
+                           ↓
+                  Generate Answer
+                           ↓
+             Display in Streamlit UI (with source citations)
 ```
 
 ## Component Details
@@ -212,6 +229,51 @@ DocumentProcessor
     └── Each with content + metadata
 ```
 
+### 🔍 Retrieval Strategy System
+
+The retrieval system uses a pluggable strategy pattern for extensibility.
+
+```python
+RetrieverFactory
+├── Registered Strategies
+│   ├── "vector"      → VectorStrategy (semantic search)
+│   ├── "bm25"        → BM25Strategy (keyword search)
+│   ├── "bm25_vector" → BM25VectorStrategy (hybrid)
+│   └── (future: "page_index", "graph_vector")
+│
+└── Strategy Interface (BaseRetrieverStrategy)
+    ├── build_index(documents) → Build/update index
+    ├── load_index()           → Load from disk
+    ├── retrieve(query, k)     → Get relevant docs
+    └── as_retriever()         → LangChain compatible
+```
+
+#### Hybrid Search (BM25 + Vector)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   BM25VectorStrategy                            │
+│                                                                 │
+│  ┌─────────────────────┐       ┌─────────────────────────┐     │
+│  │   BM25Retriever     │       │   VectorRetriever       │     │
+│  │   (keyword match)   │       │   (semantic match)      │     │
+│  │                     │       │                         │     │
+│  │  • Exact terms      │       │  • Meaning/context      │     │
+│  │  • Abbreviations    │       │  • Synonyms             │     │
+│  │  • Proper nouns     │       │  • Related concepts     │     │
+│  └──────────┬──────────┘       └───────────┬─────────────┘     │
+│             │ (k=10)                       │ (k=10)            │
+│             └──────────┬───────────────────┘                   │
+│                        ↓                                       │
+│         Reciprocal Rank Fusion (RRF)                           │
+│         weights: {vector: 0.7, bm25: 0.3}                      │
+│                        ↓                                       │
+│              Top K results (k=4)                               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**RRF Formula:** `score(d) = Σ (weight × 1/(k + rank(d)))`
+
 ### 🧠 Vector Store Architecture
 
 ```python
@@ -230,8 +292,28 @@ VectorStoreManager
 │
 └── Retrieval
     ├── Search Type: Similarity (or MMR)
-    ├── Top K: 4 (configurable)
+    ├── Top K: 10 (before fusion)
     └── Distance: Cosine similarity
+```
+
+### 📝 BM25 Store Architecture
+
+```python
+BM25Store
+├── Algorithm: BM25Okapi (rank-bm25)
+│
+├── Tokenization
+│   ├── "simple": Whitespace + punctuation split
+│   └── "nltk": NLTK word_tokenize (optional)
+│
+├── Persistence
+│   ├── Location: ./bm25_index/
+│   ├── Format: Pickle (index + documents)
+│   └── Metadata: JSON (hash, stats)
+│
+└── Retrieval
+    ├── Top K: 10 (before fusion)
+    └── Scoring: BM25 term frequency
 ```
 
 ### 🤖 LLM Integration
@@ -258,13 +340,17 @@ LLMHandler
 ### 🔗 RAG Chain
 
 ```python
-RetrievalQA Chain
-├── Retriever
-│   └── VectorStore.as_retriever(k=4)
+RAGPipeline
+├── Retrieval Strategy
+│   └── RetrieverFactory.create(strategy_name)
+│       ├── "vector"      → Vector-only retriever
+│       ├── "bm25"        → BM25-only retriever
+│       └── "bm25_vector" → Fusion retriever (default)
 │
 ├── Prompt Template
 │   ├── System Prompt (from config)
-│   ├── Retrieved Context (from vector store)
+│   ├── Main Document (priority context)
+│   ├── Retrieved Context (from strategy)
 │   └── User Question
 │
 ├── LLM
@@ -286,10 +372,35 @@ RetrievalQA Chain
 2. config.yaml
    ├── Application defaults
    ├── Model selection
+   ├── Retrieval strategy (vector, bm25, bm25_vector)
    └── RAG parameters
       ↓
 3. Code Defaults
    └── Fallback values if config missing
+```
+
+### Retrieval Configuration
+
+```yaml
+retrieval:
+  strategy: "bm25_vector"      # Which strategy to use
+  final_k: 4                   # Documents returned to LLM
+
+  vector:
+    search_type: "similarity"  # or "mmr"
+    k: 10                      # Docs before fusion
+
+  bm25:
+    k: 10                      # Docs before fusion
+    persist_path: "./bm25_index"
+    tokenizer: "simple"
+
+  fusion:
+    algorithm: "rrf"           # Reciprocal Rank Fusion
+    rrf_k: 60                  # RRF constant
+    weights:
+      vector: 0.7
+      bm25: 0.3
 ```
 
 ## Deployment Architecture
@@ -432,10 +543,30 @@ app.py
 src.rag_pipeline
  ├─ src.config_loader
  ├─ src.llm_handler
- ├─ src.vectorstore
+ ├─ src.retrieval (RetrieverFactory, strategies)
  ├─ src.main_document_loader
  ├─ src.response_enhancer
  └─ langchain
+
+src.retrieval
+ ├─ src.retrieval.base (BaseRetrieverStrategy)
+ ├─ src.retrieval.factory (RetrieverFactory)
+ ├─ src.retrieval.fusion (RRF, FusionRetriever)
+ ├─ src.retrieval.stores.bm25_store
+ └─ src.retrieval.strategies.*
+
+src.retrieval.strategies.vector
+ ├─ src.vectorstore
+ └─ src.retrieval.base
+
+src.retrieval.strategies.bm25
+ ├─ src.retrieval.stores.bm25_store
+ └─ rank_bm25
+
+src.retrieval.strategies.bm25_vector
+ ├─ src.retrieval.strategies.vector
+ ├─ src.retrieval.strategies.bm25
+ └─ src.retrieval.fusion
 
 src.main_document_loader
  ├─ src.config_loader
@@ -466,6 +597,7 @@ src.config_loader
 
 src.build_vectorstore
  ├─ src.document_processor
+ ├─ src.retrieval (RetrieverFactory)
  └─ src.vectorstore
 ```
 
@@ -537,8 +669,16 @@ DocumentProcessor.load_custom_format()
 LLMHandler.get_openai_llm()
 LLMHandler.get_anthropic_llm()
 
-# 3. New retrieval strategies
-VectorStoreManager.hybrid_search()
+# 3. New retrieval strategies (extensible system!)
+@RetrieverFactory.register("page_index")
+class PageIndexStrategy(BaseRetrieverStrategy):
+    """Vision-based document retrieval (ColPali)"""
+    ...
+
+@RetrieverFactory.register("graph_vector")
+class GraphVectorStrategy(BaseRetrieverStrategy):
+    """Knowledge graph + vector hybrid"""
+    ...
 
 # 4. New UI features
 app.py → add_authentication()
@@ -546,6 +686,35 @@ app.py → add_analytics()
 
 # 5. New embedding models
 VectorStoreManager(embedding_model="...")
+
+# 6. New fusion algorithms
+# Add to src/retrieval/fusion.py
+def custom_fusion(results_list, weights):
+    ...
+```
+
+### Adding a New Retrieval Strategy
+
+1. Create `src/retrieval/strategies/my_strategy.py`
+2. Implement `BaseRetrieverStrategy` interface
+3. Register with `@RetrieverFactory.register("my_strategy")`
+4. Add config section in `config.yaml`
+5. Import in `src/retrieval/strategies/__init__.py`
+
+```python
+from src.retrieval import RetrieverFactory
+from src.retrieval.base import BaseRetrieverStrategy
+
+@RetrieverFactory.register("my_strategy")
+class MyStrategy(BaseRetrieverStrategy):
+    @property
+    def name(self) -> str:
+        return "my_strategy"
+
+    def build_index(self, documents): ...
+    def load_index(self) -> bool: ...
+    def retrieve(self, query, k=4): ...
+    def as_retriever(self, **kwargs): ...
 ```
 
 ---
