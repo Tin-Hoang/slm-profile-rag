@@ -1,6 +1,6 @@
 [project]
 name = "slm-profile-rag"
-version = "0.1.0"
+version = "0.3.0"
 description = "A RAG chatbot that answers questions about your professional profile"
 authors = [
     {name = "Tin-Hoang", email = "tin.hoang.ai@gmail.com"}
