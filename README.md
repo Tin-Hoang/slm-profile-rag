@@ -175,6 +175,57 @@ Detailed architecture can be found in [ARCHITECTURE.md](ARCHITECTURE.md).
 </p>
 <p align="center"><em>Streamlit chatbot interface in action</em></p>
 
+### 🐳 Docker Compose
+
+Run the complete stack with Docker Compose (includes Ollama):
+
+```bash
+# Copy environment template
+cp .env.template .env
+
+# Start all services (app + Ollama)
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop services
+docker compose down
+```
+
+Access the app at `http://localhost:7860`
+
+### 📋 Makefile Commands
+
+Use the Makefile for common development tasks:
+
+```bash
+make help          # Show all available commands
+```
+
+| Category | Command | Description |
+|----------|---------|-------------|
+| **Setup** | `make setup` | Initial project setup (copy env, install deps) |
+| | `make install` | Install dependencies |
+| | `make install-dev` | Install with dev dependencies |
+| **Development** | `make run` | Run Streamlit app locally |
+| | `make index-build` | Build vector and BM25 indexes |
+| | `make index-rebuild` | Rebuild indexes from scratch |
+| **Quality** | `make test` | Run tests |
+| | `make test-cov` | Run tests with coverage |
+| | `make lint` | Run linter (ruff) |
+| | `make format` | Format code |
+| | `make check` | Run all checks |
+| **Docker** | `make docker-up` | Start all services |
+| | `make docker-down` | Stop all services |
+| | `make docker-rebuild` | Rebuild and restart |
+| | `make docker-logs` | Show logs (follow mode) |
+| | `make docker-clean` | Stop and remove volumes |
+| **Ollama** | `make ollama-pull` | Pull configured model |
+| | `make ollama-list` | List available models |
+| **Cleanup** | `make clean` | Remove build artifacts |
+| | `make clean-all` | Clean everything + indexes |
+
 ## 🌐 Deployment to Hugging Face Spaces
 
 ### Option 1: Direct Upload
@@ -252,7 +303,11 @@ slm-profile-rag/
 ├── app.py                          # Streamlit app entry point
 ├── pyproject.toml                  # UV/pip dependencies & config
 ├── config.yaml                     # RAG & LLM settings
-├── .env.example                    # Environment variables template
+├── .env.template                   # Environment variables template
+├── Makefile                        # Development commands
+├── docker-compose.yml              # Docker Compose configuration
+├── Dockerfile                      # Docker image (standalone with Ollama)
+├── Dockerfile.app                  # Docker image (for Compose)
 ├── README.md
 ├── data/
 │   └── documents/                  # Your profile documents
