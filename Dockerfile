@@ -26,7 +26,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p data/documents chroma_db
+RUN mkdir -p data/documents chroma_db bm25_index
 
 # Expose Streamlit port
 EXPOSE 7860
@@ -52,10 +52,10 @@ MODEL=${OLLAMA_MODEL:-llama3.2:3b}
 echo "Pulling model: $MODEL"
 ollama pull $MODEL || echo "Model pull failed, will retry on app start"
 
-# Build vector store if documents exist and DB doesn't
-if [ -d "data/documents" ] && [ ! -d "chroma_db/chroma.sqlite3" ]; then
-    echo "Building vector store..."
-    python -m src.build_vectorstore || echo "Vector store build failed, will build on first use"
+# Build retrieval indexes if documents exist and indexes don't
+if [ -d "data/documents" ] && [ ! -f "chroma_db/chroma.sqlite3" ]; then
+    echo "Building retrieval indexes (BM25 + Vector)..."
+    python -m src.build_vectorstore || echo "Index build failed, will build on first use"
 fi
 
 # Start Streamlit
