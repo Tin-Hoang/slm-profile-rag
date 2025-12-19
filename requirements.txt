@@ -229,6 +229,7 @@ numpy==2.3.5
     #   onnxruntime
     #   pandas
     #   pydeck
+    #   rank-bm25
     #   scikit-learn
     #   scipy
     #   streamlit
@@ -359,6 +360,8 @@ pyyaml==6.0.3
     #   langchain-core
     #   transformers
     #   uvicorn
+rank-bm25==0.2.2
+    # via slm-profile-rag (pyproject.toml)
 referencing==0.37.0
     # via
     #   jsonschema
