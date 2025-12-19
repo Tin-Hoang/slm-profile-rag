@@ -117,26 +117,22 @@ class VectorStoreManager:
         if self.vectorstore is None:
             self.load_vectorstore()
 
-        # Get search configuration from config
-        search_type = self.config.get("vectorstore.search_type", "similarity")
-        search_kwargs = self.config.get("vectorstore.search_kwargs", {"k": 4})
+        # Get search configuration from retrieval config
+        search_type = self.config.get("retrieval.vector.search_type", "similarity")
+        search_kwargs_config = self.config.get("retrieval.vector.search_kwargs", {})
+        k = self.config.get("retrieval.vector.k", 4)
 
-        # Filter search_kwargs based on search_type
-        # Only 'k' is valid for similarity search
-        # 'fetch_k' and 'lambda_mult' are only valid for MMR search
+        # Build search_kwargs based on search_type
         if search_type == "similarity":
-            # For similarity search, only keep 'k' parameter
-            filtered_kwargs = {"k": search_kwargs.get("k", 4)}
+            filtered_kwargs = {"k": k}
         elif search_type == "mmr":
-            # For MMR search, keep all parameters
             filtered_kwargs = {
-                "k": search_kwargs.get("k", 4),
-                "fetch_k": search_kwargs.get("fetch_k", 20),
-                "lambda_mult": search_kwargs.get("lambda_mult", 0.5),
+                "k": k,
+                "fetch_k": search_kwargs_config.get("fetch_k", 20),
+                "lambda_mult": search_kwargs_config.get("lambda_mult", 0.5),
             }
         else:
-            # Default to just k
-            filtered_kwargs = {"k": search_kwargs.get("k", 4)}
+            filtered_kwargs = {"k": k}
 
         # Override with provided kwargs
         filtered_kwargs.update(kwargs)

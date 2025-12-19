@@ -83,12 +83,53 @@ vectorstore:
   collection_name: "profile_documents"
   persist_directory: "./chroma_db"
 
-  # Search configuration
-  search_type: "similarity"  # Options: similarity, mmr
-  search_kwargs:
-    k: 4  # Number of documents to retrieve
-    fetch_k: 20  # For MMR
-    lambda_mult: 0.5  # For MMR diversity
+# Retrieval Strategy Configuration
+# Extensible system supporting multiple retrieval approaches
+retrieval:
+  # Primary strategy selection
+  # Options: vector, bm25, bm25_vector
+  # Future: page_index, graph_vector
+  strategy: "bm25_vector"
+
+  # Final number of documents to return after retrieval/fusion
+  final_k: 4
+
+  # Vector search settings (used by: vector, bm25_vector, graph_vector)
+  vector:
+    enabled: true
+    search_type: "similarity"  # similarity, mmr
+    k: 10  # Docs to retrieve before fusion (when using hybrid)
+    search_kwargs:
+      fetch_k: 20  # For MMR
+      lambda_mult: 0.5  # For MMR diversity
+
+  # BM25 lexical search settings (used by: bm25, bm25_vector)
+  bm25:
+    enabled: true
+    k: 10  # Docs to retrieve before fusion
+    persist_path: "./bm25_index"
+    tokenizer: "simple"  # Options: simple, nltk (requires nltk package)
+
+  # Fusion settings (used by: bm25_vector, graph_vector, any multi-source strategy)
+  fusion:
+    algorithm: "rrf"  # Options: rrf (reciprocal rank fusion), weighted
+    rrf_k: 60  # RRF constant (higher = less aggressive re-ranking)
+    weights:
+      vector: 0.7  # Weight for vector search results
+      bm25: 0.3  # Weight for BM25 results
+      graph: 0.0  # Reserved for future graph_vector strategy
+
+  # Page Index settings (future: page_index strategy)
+  # page_index:
+  #   enabled: false
+  #   model: "vidore/colpali-v1.2"
+  #   persist_path: "./page_index"
+
+  # Graph settings (future: graph_vector strategy)
+  # graph:
+  #   enabled: false
+  #   store_type: "networkx"  # networkx, neo4j
+  #   persist_path: "./graph_store"
 
 # Document Processing Configuration
 document_processing:
@@ -151,9 +192,6 @@ main_document:
 
 # RAG Pipeline Configuration
 rag:
-  # Retrieval settings
-  retrieval_mode: "contextual"  # Options: simple, contextual, hybrid
-
   # Reranking (optional, set to false if not using)
   use_reranking: false
 

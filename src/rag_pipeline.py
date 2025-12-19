@@ -7,13 +7,17 @@ from typing import Any
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.retrievers import BaseRetriever
 from langchain_core.runnables import RunnablePassthrough
 
 from .config_loader import get_config
 from .llm_handler import get_llm_handler
 from .main_document_loader import get_main_document_loader
 from .response_enhancer import get_response_enhancer
-from .vectorstore import get_vectorstore_manager
+
+# Import retrieval components
+from .retrieval import RetrieverFactory
+from .retrieval.strategies import BM25Strategy, BM25VectorStrategy, VectorStrategy  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -21,26 +25,31 @@ logger = logging.getLogger(__name__)
 class RAGPipeline:
     """RAG pipeline for question answering."""
 
-    def __init__(self, llm_handler=None):
+    def __init__(self, llm_handler=None, retrieval_strategy: str | None = None):
         """Initialize RAG pipeline.
 
         Args:
             llm_handler: Optional LLMHandler instance for custom provider/model
+            retrieval_strategy: Override retrieval strategy (uses config if None)
         """
         self.config = get_config()
         self.llm_handler = llm_handler or get_llm_handler()
-        self.vectorstore_manager = get_vectorstore_manager()
         self.response_enhancer = get_response_enhancer()
         self.main_doc_loader = get_main_document_loader()
-
-        # Load vector store
-        self.vectorstore_manager.load_vectorstore()
 
         # Get LLM
         self.llm = self.llm_handler.get_llm()
 
-        # Get retriever
-        self.retriever = self.vectorstore_manager.get_retriever()
+        # Initialize retrieval strategy
+        self.retrieval_strategy_name = retrieval_strategy or self.config.get(
+            "retrieval.strategy", "vector"
+        )
+        self.retrieval_strategy = self._create_retrieval_strategy()
+
+        # Get retriever from strategy
+        self.retriever = self._get_retriever()
+
+        logger.info(f"Initialized RAG pipeline with '{self.retrieval_strategy_name}' strategy")
 
         # Load main document if enabled
         self.main_doc_content = ""
@@ -369,7 +378,76 @@ Answer: """
 
         return budget
 
+    def _create_retrieval_strategy(self):
+        """Create the retrieval strategy based on configuration.
 
-def get_rag_pipeline() -> RAGPipeline:
-    """Get RAG pipeline instance."""
-    return RAGPipeline()
+        Returns:
+            BaseRetrieverStrategy instance
+        """
+        # Build config dict for the strategy
+        config_dict = {
+            "retrieval": {
+                "strategy": self.retrieval_strategy_name,
+                "final_k": self.config.get("retrieval.final_k", 4),
+                "vector": {
+                    "search_type": self.config.get("retrieval.vector.search_type", "similarity"),
+                    "k": self.config.get("retrieval.vector.k", 10),
+                    "search_kwargs": self.config.get("retrieval.vector.search_kwargs", {}),
+                },
+                "bm25": {
+                    "k": self.config.get("retrieval.bm25.k", 10),
+                    "persist_path": self.config.get("retrieval.bm25.persist_path", "./bm25_index"),
+                    "tokenizer": self.config.get("retrieval.bm25.tokenizer", "simple"),
+                },
+                "fusion": {
+                    "algorithm": self.config.get("retrieval.fusion.algorithm", "rrf"),
+                    "rrf_k": self.config.get("retrieval.fusion.rrf_k", 60),
+                    "weights": self.config.get(
+                        "retrieval.fusion.weights", {"vector": 0.7, "bm25": 0.3}
+                    ),
+                },
+            }
+        }
+
+        strategy = RetrieverFactory.create(self.retrieval_strategy_name, config_dict)
+
+        # Load existing index
+        if not strategy.load_index():
+            logger.warning(
+                f"Could not load index for '{self.retrieval_strategy_name}' strategy. "
+                f"Run 'python -m src.build_vectorstore --strategy {self.retrieval_strategy_name}' first."
+            )
+
+        return strategy
+
+    def _get_retriever(self) -> BaseRetriever:
+        """Get the LangChain retriever from the strategy.
+
+        Returns:
+            BaseRetriever instance
+        """
+        final_k = self.config.get("retrieval.final_k", 4)
+        return self.retrieval_strategy.as_retriever(k=final_k)
+
+    def get_retrieval_info(self) -> dict[str, Any]:
+        """Get information about the current retrieval strategy.
+
+        Returns:
+            Dictionary with retrieval strategy information
+        """
+        return {
+            "strategy": self.retrieval_strategy_name,
+            "stats": self.retrieval_strategy.get_index_stats(),
+        }
+
+
+def get_rag_pipeline(retrieval_strategy: str | None = None) -> RAGPipeline:
+    """Get RAG pipeline instance.
+
+    Args:
+        retrieval_strategy: Override retrieval strategy (uses config if None)
+
+    Returns:
+        RAGPipeline instance
+    """
+    return RAGPipeline(retrieval_strategy=retrieval_strategy)
