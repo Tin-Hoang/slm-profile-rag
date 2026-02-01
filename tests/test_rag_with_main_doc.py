@@ -112,6 +112,7 @@ class TestRAGWithMainDocument:
         assert "main_doc_tokens" in budget
         assert "max_output_tokens" in budget
         assert "buffer_tokens" in budget
+        assert "estimated_chat_history_tokens" in budget
         assert "available_for_retrieval" in budget
         assert "total_input_budget" in budget
 
@@ -120,14 +121,16 @@ class TestRAGWithMainDocument:
         assert budget["main_doc_tokens"] >= 0
         assert budget["max_output_tokens"] > 0
         assert budget["buffer_tokens"] >= 0
+        assert budget["estimated_chat_history_tokens"] >= 0
         assert budget["available_for_retrieval"] >= 0
 
-        # Check math
+        # Check math (must account for estimated chat history tokens)
         expected_available = (
             budget["model_context_window"]
             - budget["main_doc_tokens"]
             - budget["max_output_tokens"]
             - budget["buffer_tokens"]
+            - budget["estimated_chat_history_tokens"]
         )
         assert budget["available_for_retrieval"] == max(0, expected_available)
 
