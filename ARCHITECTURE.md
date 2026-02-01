@@ -121,6 +121,13 @@ projects.docx docx  chunks  │  ./bm25_index/              │
 User Question
      ↓
 ┌─────────────────────────────────────┐
+│ Extract Chat History (if enabled)     │
+│  • Format previous Q&A pairs         │
+│  • Truncate by turns/tokens          │
+│  • Include in context                │
+└────────────┬────────────────────────┘
+             ↓
+┌─────────────────────────────────────┐
 │ Load Main Document (if enabled)      │
 │  • Check cache validity              │
 │  • Auto-detect format                │
@@ -151,11 +158,17 @@ User Question
                  └─────────┬───────────────────┘
                            ↓
                   Construct Prompt:
-       System Prompt + Main Doc + Retrieved Context + Question
+    System Prompt → Chat History → Main Doc → Retrieved Context → Question
                            ↓
-                  Send to Ollama LLM
+                  Send to LLM (Ollama/Groq)
                            ↓
-                  Generate Answer
+                  Generate Answer (streaming)
+                           ↓
+                  Response Enhancer
+                  • Detect negative phrases
+                  • Rewrite positively
+                  • Fix markdown formatting
+                  • Add forward-looking closings
                            ↓
              Display in Streamlit UI (with source citations)
 ```
@@ -209,6 +222,8 @@ Combined Context → LLM → Response
 - ✅ Intelligent token management with LLM summarization
 - ✅ Efficient caching for performance
 - ✅ Graceful degradation if unavailable
+
+**Note:** The system also supports chat history for conversational context. Previous Q&A pairs are included in the prompt (after system prompt, before main document) with configurable truncation by turns or tokens. Responses are post-processed to improve tone, remove negative language, and fix markdown formatting.
 
 ### 📄 Document Processing Pipeline
 
@@ -320,21 +335,35 @@ BM25Store
 
 ```python
 LLMHandler
-├── Provider: Ollama
-│   ├── Base URL: http://localhost:11434
-│   └── Protocol: HTTP/REST API
+├── Provider Support
+│   ├── Ollama (Local)
+│   │   ├── Base URL: http://localhost:11434
+│   │   ├── Protocol: HTTP/REST API
+│   │   └── Auto-detected if no API key
+│   │
+│   └── Groq (Cloud)
+│       ├── Base URL: https://api.groq.com/openai/v1
+│       ├── Protocol: OpenAI-compatible API
+│       └── Requires GROQ_API_KEY env var
 │
-├── Model Options
+├── Model Options (Ollama)
 │   ├── llama3.2:3b  (Recommended)
 │   ├── phi3:mini
 │   ├── gemma2:2b
 │   └── llama3.1:8b  (with GPU)
 │
+├── Model Options (Groq)
+│   ├── openai/gpt-oss-120b
+│   ├── llama-3.3-70b-versatile
+│   ├── llama-3.1-8b-instant
+│   ├── mixtral-8x7b-32768
+│   └── gemma2-9b-it
+│
 └── Parameters
     ├── Temperature: 0.7
-    ├── Max Tokens: 512
+    ├── Max Tokens: 800 (increased for better formatting)
     ├── Top P: 0.9
-    └── Context Window: 8192 tokens
+    └── Context Window: Model-dependent (8192-128k tokens)
 ```
 
 ### 🔗 RAG Chain
@@ -347,17 +376,18 @@ RAGPipeline
 │       ├── "bm25"        → BM25-only retriever
 │       └── "bm25_vector" → Fusion retriever (default)
 │
-├── Prompt Template
+├── Prompt Template Structure
 │   ├── System Prompt (from config)
-│   ├── Main Document (priority context)
+│   ├── Chat History (formatted previous Q&A pairs)
+│   ├── Main Document (priority context, always available)
 │   ├── Retrieved Context (from strategy)
 │   └── User Question
 │
 ├── LLM
-│   └── Ollama (configured model)
+│   └── Ollama or Groq (auto-detected or configured)
 │
 └── Output
-    ├── Answer (generated text)
+    ├── Answer (post-processed for tone/formatting, streaming support)
     └── Source Documents (citations)
 ```
 
@@ -403,6 +433,24 @@ retrieval:
       bm25: 0.3
 ```
 
+### Chat History Configuration
+
+```yaml
+chat:
+  enable_history: true         # Enable conversation context
+  max_history_turns: 10        # Max Q&A pairs to include
+  max_history_tokens: 2000      # Token limit for history
+```
+
+### RAG Configuration
+
+```yaml
+rag:
+  enhance_responses: true       # Enable post-processing enhancement
+  include_sources: true         # Show source citations
+  source_max_length: 150        # Max length of source preview
+```
+
 ## Deployment Architecture
 
 ### Local Development
@@ -413,8 +461,13 @@ retrieval:
 │   Machine        │
 │                  │
 │  ┌────────────┐  │
-│  │  Ollama    │  │  ← Port 11434
+│  │  Ollama    │  │  ← Port 11434 (optional)
 │  │  Server    │  │
+│  └────────────┘  │
+│                  │
+│  ┌────────────┐  │
+│  │  Groq API  │  │  ← https://api.groq.com (optional)
+│  │  (Cloud)   │  │
 │  └────────────┘  │
 │                  │
 │  ┌────────────┐  │
@@ -424,6 +477,11 @@ retrieval:
 │                  │
 │  ┌────────────┐  │
 │  │ ChromaDB   │  │  ← ./chroma_db/
+│  │  (local)   │  │
+│  └────────────┘  │
+│                  │
+│  ┌────────────┐  │
+│  │ BM25 Index │  │  ← ./bm25_index/
 │  │  (local)   │  │
 │  └────────────┘  │
 └──────────────────┘
@@ -439,6 +497,7 @@ retrieval:
 │  │  Dockerfile             │  │
 │  │  ├─ Install Ollama      │  │
 │  │  ├─ Pull Model          │  │
+│  │  ├─ Build Indexes       │  │
 │  │  └─ Start Services      │  │
 │  └─────────────────────────┘  │
 │                               │
@@ -449,7 +508,8 @@ retrieval:
 │                               │
 │  ┌─────────────────────────┐  │
 │  │  Persistent Storage     │  │
-│  │  └─ chroma_db/          │  │
+│  │  ├─ chroma_db/          │  │
+│  │  └─ bm25_index/          │  │
 │  └─────────────────────────┘  │
 └───────────────────────────────┘
          ↑
@@ -538,7 +598,10 @@ Developer Writes Code
 app.py
  ├─ src.config_loader
  ├─ src.rag_pipeline
- └─ streamlit
+ ├─ src.llm_handler (provider detection)
+ ├─ src.response_enhancer (post-stream enhancement)
+ ├─ src.main_document_loader (token counting for history)
+ └─ streamlit (UI, chat history management)
 
 src.rag_pipeline
  ├─ src.config_loader
@@ -546,7 +609,7 @@ src.rag_pipeline
  ├─ src.retrieval (RetrieverFactory, strategies)
  ├─ src.main_document_loader
  ├─ src.response_enhancer
- └─ langchain
+ └─ langchain (LCEL chains)
 
 src.retrieval
  ├─ src.retrieval.base (BaseRetrieverStrategy)
@@ -575,6 +638,10 @@ src.main_document_loader
  ├─ tiktoken
  └─ pathlib, hashlib, time
 
+src.response_enhancer
+ ├─ src.config_loader
+ └─ re (regex pattern matching)
+
 src.vectorstore
  ├─ src.config_loader
  ├─ chromadb
@@ -582,7 +649,8 @@ src.vectorstore
 
 src.llm_handler
  ├─ src.config_loader
- └─ langchain_community.llms
+ ├─ langchain_community.llms (Ollama)
+ └─ langchain_groq (Groq support)
 
 src.document_processor
  ├─ src.config_loader
@@ -613,12 +681,19 @@ src.build_vectorstore
 
 ### Query (Runtime)
 
-| Step | Time (CPU) | Time (GPU) |
-|------|------------|------------|
-| Embed query | 50ms | 10ms |
-| Vector search | 10-50ms | 10-50ms |
-| LLM inference | 2-5s | 0.5-1s |
-| **Total** | **2-5s** | **0.5-1s** |
+| Step | Time (CPU) | Time (GPU) | Notes |
+|------|------------|------------|-------|
+| Chat history extraction | <1ms | <1ms | Token counting overhead |
+| Main doc loading | <1ms | <1ms | Cached after first load |
+| Embed query | 50ms | 10ms | Sentence transformers |
+| Vector search | 10-50ms | 10-50ms | ChromaDB HNSW |
+| BM25 search | 5-20ms | 5-20ms | In-memory index |
+| Fusion (RRF) | <1ms | <1ms | Rank combination |
+| LLM inference (Ollama) | 2-5s | 0.5-1s | Local model |
+| LLM inference (Groq) | 0.5-2s | N/A | Cloud API |
+| Response enhancement | <10ms | <10ms | Post-processing |
+| **Total (Ollama)** | **2-5s** | **0.5-1s** | |
+| **Total (Groq)** | **0.6-2s** | **N/A** | Faster cloud option |
 
 ### Memory Usage
 
@@ -627,7 +702,10 @@ src.build_vectorstore
 | Streamlit | ~200MB | - |
 | Ollama (llama3.2:3b) | ~2GB | ~2GB |
 | ChromaDB | ~100MB | ~50MB per 1k docs |
+| BM25 Index | ~50MB | ~10MB per 1k docs |
 | Embeddings | ~500MB | ~500MB |
+| Chat History | ~1-10MB | - |
+| Response Enhancer | <1MB | - |
 | **Total** | **~3GB** | **~3GB** |
 
 ## Security Architecture
@@ -668,6 +746,7 @@ DocumentProcessor.load_custom_format()
 # 2. New LLM providers
 LLMHandler.get_openai_llm()
 LLMHandler.get_anthropic_llm()
+# Already supports: Ollama (local), Groq (cloud)
 
 # 3. New retrieval strategies (extensible system!)
 @RetrieverFactory.register("page_index")
@@ -683,6 +762,7 @@ class GraphVectorStrategy(BaseRetrieverStrategy):
 # 4. New UI features
 app.py → add_authentication()
 app.py → add_analytics()
+# Already supports: Chat history, provider switching, streaming responses
 
 # 5. New embedding models
 VectorStoreManager(embedding_model="...")
@@ -691,6 +771,14 @@ VectorStoreManager(embedding_model="...")
 # Add to src/retrieval/fusion.py
 def custom_fusion(results_list, weights):
     ...
+
+# 7. New response enhancement patterns
+# Edit src/response_enhancer.py
+ResponseEnhancer.negative_patterns.append((pattern, rewrite_func))
+
+# 8. Custom chat history strategies
+# Modify truncate_chat_history() in app.py
+# Add custom truncation logic (e.g., importance-based)
 ```
 
 ### Adding a New Retrieval Strategy
