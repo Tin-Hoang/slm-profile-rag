@@ -8,7 +8,6 @@ from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.retrievers import BaseRetriever
-from langchain_core.runnables import RunnablePassthrough
 
 from .config_loader import get_config
 from .llm_handler import get_llm_handler
@@ -74,15 +73,17 @@ class RAGPipeline:
         self.qa_chain = self._create_qa_chain()
 
     def _create_prompt_template(self) -> ChatPromptTemplate:
-        """Create prompt template for RAG with main document support.
+        """Create prompt template for RAG with main document and chat history support.
 
         Returns:
             ChatPromptTemplate instance
         """
         system_prompt = self.llm_handler.get_system_prompt()
 
-        # Structure: System Prompt → Main Doc (BEFORE) → VectorDB Context → Question
+        # Structure: System Prompt → Chat History → Main Doc → VectorDB Context → Question
         template = f"""{system_prompt}
+
+{{chat_history}}
 
 {{main_document_section}}
 {{context}}
@@ -92,6 +93,33 @@ Question: {{question}}
 Answer: """
 
         return ChatPromptTemplate.from_template(template)
+
+    def _format_chat_history(self, chat_history: list[dict] | None) -> str:
+        """Format chat history for inclusion in prompt.
+
+        Args:
+            chat_history: List of message dicts with 'role' and 'content' keys
+
+        Returns:
+            Formatted chat history string
+        """
+        if not chat_history:
+            return ""
+
+        formatted_lines = []
+        for msg in chat_history:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+
+            if role == "user":
+                formatted_lines.append(f"User: {content}")
+            elif role == "assistant":
+                formatted_lines.append(f"Assistant: {content}")
+
+        if formatted_lines:
+            return "=== PREVIOUS CONVERSATION ===\n" + "\n".join(formatted_lines) + "\n\n"
+
+        return ""
 
     def _format_docs(self, docs: list[Document]) -> str:
         """Format documents into a single string.
@@ -126,17 +154,24 @@ Answer: """
 """
 
     def _create_qa_chain(self):
-        """Create retrieval QA chain using LCEL with main document.
+        """Create retrieval QA chain using LCEL with main document and chat history.
 
         Returns:
             LCEL chain
         """
         # Create the RAG chain with main document positioned BEFORE retrieval context
+        # Chat history will be injected via the invoke/stream methods
+        # The chain expects a dict with 'question' and optionally 'chat_history'
         chain = (
             {
                 "main_document_section": lambda _: self._format_main_doc(),
-                "context": self.retriever | self._format_docs,
-                "question": RunnablePassthrough(),
+                "context": (lambda x: x.get("question", x) if isinstance(x, dict) else x)
+                | self.retriever
+                | self._format_docs,
+                "question": lambda x: x.get("question", x) if isinstance(x, dict) else x,
+                "chat_history": lambda x: self._format_chat_history(x.get("chat_history", []))
+                if isinstance(x, dict)
+                else "",
             }
             | self.prompt_template
             | self.llm
@@ -145,20 +180,29 @@ Answer: """
 
         return chain
 
-    def query(self, question: str) -> dict[str, Any]:
+    def query(self, question: str, chat_history: list[dict] | None = None) -> dict[str, Any]:
         """Query the RAG pipeline.
 
         Args:
             question: User question
+            chat_history: Optional list of previous messages with 'role' and 'content' keys
 
         Returns:
             Dictionary with 'result' and optionally 'source_documents'
         """
         logger.info(f"Processing query: {question}")
+        if chat_history:
+            logger.debug(f"Including {len(chat_history)} previous messages in context")
 
         try:
+            # Prepare input with chat history
+            chain_input = {
+                "question": question,
+                "chat_history": chat_history or [],
+            }
+
             # Get the answer from the chain
-            answer = self.qa_chain.invoke(question)
+            answer = self.qa_chain.invoke(chain_input)
 
             # Enhance the response for better tone and professionalism
             if self.config.get("rag.enhance_responses", True):
@@ -185,67 +229,84 @@ Answer: """
                 "source_documents": [],
             }
 
-    def get_answer(self, question: str) -> str:
+    def get_answer(self, question: str, chat_history: list[dict] | None = None) -> str:
         """Get answer to a question (simplified interface).
 
         Args:
             question: User question
+            chat_history: Optional list of previous messages with 'role' and 'content' keys
 
         Returns:
             Answer string
         """
-        response = self.query(question)
+        response = self.query(question, chat_history=chat_history)
         return response.get("result", "I couldn't generate an answer.")
 
-    def get_answer_with_sources(self, question: str) -> tuple[str, list[Document]]:
+    def get_answer_with_sources(
+        self, question: str, chat_history: list[dict] | None = None
+    ) -> tuple[str, list[Document]]:
         """Get answer with source documents.
 
         Args:
             question: User question
+            chat_history: Optional list of previous messages with 'role' and 'content' keys
 
         Returns:
             Tuple of (answer, source_documents)
         """
-        response = self.query(question)
+        response = self.query(question, chat_history=chat_history)
         answer = response.get("result", "I couldn't generate an answer.")
         sources = response.get("source_documents", [])
         return answer, sources
 
-    def stream_query(self, question: str) -> Iterator[str]:
+    def stream_query(self, question: str, chat_history: list[dict] | None = None) -> Iterator[str]:
         """Stream the response token by token.
 
         Args:
             question: User question
+            chat_history: Optional list of previous messages with 'role' and 'content' keys
 
         Yields:
             Response chunks as they are generated
         """
         logger.info(f"Streaming query: {question}")
+        if chat_history:
+            logger.debug(f"Including {len(chat_history)} previous messages in context")
 
         try:
+            # Prepare input with chat history
+            chain_input = {
+                "question": question,
+                "chat_history": chat_history or [],
+            }
+
             # Stream the response using LCEL's stream method
-            yield from self.qa_chain.stream(question)
+            yield from self.qa_chain.stream(chain_input)
 
         except Exception as e:
             logger.error(f"Error streaming query: {e}")
             yield "I encountered a technical issue. Please try rephrasing your question."
 
-    def stream_answer(self, question: str) -> Iterator[str]:
+    def stream_answer(self, question: str, chat_history: list[dict] | None = None) -> Iterator[str]:
         """Stream answer to a question (simplified interface).
 
         Args:
             question: User question
+            chat_history: Optional list of previous messages with 'role' and 'content' keys
 
         Yields:
             Answer chunks as they are generated
         """
-        yield from self.stream_query(question)
+        yield from self.stream_query(question, chat_history=chat_history)
 
-    def get_source_documents(self, question: str) -> list[Document]:
+    def get_source_documents(
+        self, question: str, _chat_history: list[dict] | None = None
+    ) -> list[Document]:
         """Get source documents for a question (can run in parallel with streaming).
 
         Args:
             question: User question
+            _chat_history: Optional list of previous messages (not used for retrieval, kept for API consistency)
 
         Returns:
             List of source documents
@@ -329,6 +390,10 @@ Answer: """
     def _calculate_context_budget(self) -> dict[str, int]:
         """Calculate and log token budget distribution.
 
+        Note: Chat history tokens are handled dynamically per query and are not
+        included in this static budget calculation. The app.py truncation logic
+        ensures chat history fits within the configured limits.
+
         Returns:
             Dictionary with token budget breakdown
         """
@@ -349,10 +414,21 @@ Answer: """
         max_output_tokens = self.config.get("llm.max_tokens", 512)
         main_doc_tokens = self.main_doc_loader.count_tokens(self.main_doc_content)
 
-        # Reserve space: Main Doc + Output + Safety Buffer
+        # Reserve space: Main Doc + Output + Safety Buffer + Chat History (estimated)
         buffer_tokens = 500
+
+        # Estimate chat history tokens (max configured limit)
+        max_history_tokens = self.config.get("chat.max_history_tokens", 2000)
+        estimated_history_tokens = (
+            max_history_tokens if self.config.get("chat.enable_history", True) else 0
+        )
+
         available_for_retrieval = (
-            model_context_window - main_doc_tokens - max_output_tokens - buffer_tokens
+            model_context_window
+            - main_doc_tokens
+            - max_output_tokens
+            - buffer_tokens
+            - estimated_history_tokens
         )
 
         budget = {
@@ -360,6 +436,7 @@ Answer: """
             "main_doc_tokens": main_doc_tokens,
             "max_output_tokens": max_output_tokens,
             "buffer_tokens": buffer_tokens,
+            "estimated_chat_history_tokens": estimated_history_tokens,
             "available_for_retrieval": max(0, available_for_retrieval),
             "total_input_budget": model_context_window - max_output_tokens,
         }
@@ -374,6 +451,17 @@ Answer: """
             logger.warning(
                 f"Main document uses {usage_percent:.1f}% of context window. "
                 f"Consider summarizing or reducing size."
+            )
+
+        # Warning if estimated total usage is high
+        total_estimated = main_doc_tokens + estimated_history_tokens + buffer_tokens
+        total_percent = (
+            (total_estimated / model_context_window) * 100 if model_context_window > 0 else 0
+        )
+        if total_percent > 70:
+            logger.warning(
+                f"Estimated context usage ({total_percent:.1f}%) is high. "
+                f"Consider reducing main document size or chat history limits."
             )
 
         return budget

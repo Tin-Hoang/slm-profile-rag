@@ -354,6 +354,80 @@ def display_sidebar():
             st.markdown(f"- Overlap: {config.get('document_processing.chunk_overlap', 'N/A')}")
 
 
+def extract_chat_history(messages: list, exclude_last: bool = True) -> list[dict]:
+    """Extract and format chat history for LLM.
+
+    Args:
+        messages: List of Streamlit message dicts
+        exclude_last: Whether to exclude the last message (usually the current one being processed)
+
+    Returns:
+        List of formatted message dicts with 'role' and 'content' keys
+    """
+    if not messages:
+        return []
+
+    # Exclude the last message if requested (current user message being processed)
+    history_messages = messages[:-1] if exclude_last else messages
+
+    # Filter to only user and assistant messages, format for LLM
+    formatted_history = []
+    for msg in history_messages:
+        role = msg.get("role")
+        content = msg.get("content", "")
+
+        if role in ("user", "assistant") and content:
+            formatted_history.append({"role": role, "content": content})
+
+    return formatted_history
+
+
+def truncate_chat_history(
+    history: list[dict], max_turns: int | None = None, max_tokens: int | None = None
+) -> list[dict]:
+    """Truncate chat history based on turn count or token limit.
+
+    Args:
+        history: List of message dicts
+        max_turns: Maximum number of Q&A pairs to keep (None = no limit)
+        max_tokens: Maximum tokens allowed (None = no limit)
+
+    Returns:
+        Truncated history list
+    """
+    from src.main_document_loader import get_main_document_loader
+
+    if not history:
+        return []
+
+    # Apply turn-based truncation first (keep most recent)
+    if max_turns is not None and max_turns > 0:
+        # Each turn = 1 user + 1 assistant message
+        max_messages = max_turns * 2
+        history = history[-max_messages:] if len(history) > max_messages else history
+
+    # Apply token-based truncation if needed
+    if max_tokens is not None and max_tokens > 0:
+        loader = get_main_document_loader()
+        current_tokens = 0
+        truncated_history = []
+
+        # Go through history in reverse, adding messages until we hit token limit
+        for msg in reversed(history):
+            content = msg.get("content", "")
+            msg_tokens = loader.count_tokens(content)
+
+            if current_tokens + msg_tokens <= max_tokens:
+                truncated_history.insert(0, msg)
+                current_tokens += msg_tokens
+            else:
+                break
+
+        return truncated_history
+
+    return history
+
+
 def display_chat_messages():
     """Display chat messages."""
     config = st.session_state.config
@@ -392,6 +466,25 @@ def process_user_input(prompt: str):
         if config.get("ui.show_timestamps", True):
             st.caption(f"_{timestamp}_")
 
+    # Extract and prepare chat history
+    chat_history = []
+    if config.get("chat.enable_history", True):
+        # Extract history excluding the current message we just added
+        raw_history = extract_chat_history(st.session_state.messages, exclude_last=True)
+
+        # Truncate based on configuration
+        max_turns = config.get("chat.max_history_turns", 10)
+        max_tokens = config.get("chat.max_history_tokens", 2000)
+
+        chat_history = truncate_chat_history(
+            raw_history,
+            max_turns=max_turns if max_turns > 0 else None,
+            max_tokens=max_tokens if max_tokens > 0 else None,
+        )
+
+        if chat_history:
+            logger.debug(f"Including {len(chat_history)} messages from chat history")
+
     # Generate streaming response
     with st.chat_message("assistant"):
         try:
@@ -401,7 +494,7 @@ def process_user_input(prompt: str):
             # Stream the response token by token with spinner
             streamed_content = ""
             with st.spinner("Thinking (this may take a few minutes on a free-tier HF space)..."):
-                for chunk in rag_pipeline.stream_answer(prompt):
+                for chunk in rag_pipeline.stream_answer(prompt, chat_history=chat_history):
                     streamed_content += chunk
                     response_placeholder.markdown(streamed_content + "▌")
 
@@ -422,7 +515,7 @@ def process_user_input(prompt: str):
                     logger.debug("Response enhanced for better tone")
 
             # Get source documents (after streaming completes)
-            sources = rag_pipeline.get_source_documents(prompt)
+            sources = rag_pipeline.get_source_documents(prompt, chat_history=chat_history)
             sources_text = ""
             if config.get("rag.include_sources", True) and sources:
                 sources_text = rag_pipeline.format_sources(sources)

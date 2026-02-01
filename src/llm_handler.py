@@ -25,13 +25,14 @@ DEFAULT_OLLAMA_MODEL = "llama3.2:3b"
 
 # Available Groq models (free tier)
 GROQ_MODELS = [
+    "openai/gpt-oss-120b",
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
     "mixtral-8x7b-32768",
     "gemma2-9b-it",
 ]
 
-DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
 
 
 class LLMHandler:

@@ -10,7 +10,7 @@ profile:
 llm:
   provider: "ollama"  # Options: ollama, groq (auto-detected if GROQ_API_KEY is set)
   model: "llama3.2:3b"  # For Ollama. Other options: phi3:mini, gemma2:2b
-  groq_model: "llama-3.3-70b-versatile"  # For Groq. Options: llama-3.1-8b-instant, mixtral-8x7b-32768, gemma2-9b-it
+  groq_model: "openai/gpt-oss-120b"  # For Groq. Options: llama-3.3-70b-versatile, llama-3.1-8b-instant, mixtral-8x7b-32768, gemma2-9b-it
   temperature: 0.7
   max_tokens: 800  # Increased for better-formatted, complete responses
   top_p: 0.9
@@ -134,8 +134,11 @@ retrieval:
 # Document Processing Configuration
 document_processing:
   # Chunking strategy
-  chunk_size: 1000  # Characters per chunk
-  chunk_overlap: 200  # Overlap between chunks
+  # Recommended: 800-1000 chars for professional profiles (structured sections, bullet points)
+  # Smaller chunks (800) = better granularity, more precise retrieval
+  # Larger chunks (1200) = preserve more context per chunk, fewer chunks
+  chunk_size: 1500  # Characters per chunk (optimized for structured profile content)
+  chunk_overlap: 300  # Overlap between chunks (~20% - preserves context at boundaries)
 
   # Supported file types
   supported_extensions:
@@ -202,6 +205,17 @@ rag:
   include_sources: true  # Show source documents in response
   source_max_length: 150  # Max length of source preview
   enhance_responses: true  # Apply post-processing to improve tone and remove negative language
+
+# Chat History Configuration
+chat:
+  # Enable conversation history
+  enable_history: true
+
+  # Maximum number of previous Q&A pairs to include in context
+  max_history_turns: 10
+
+  # Maximum tokens to allocate for chat history (0 = no limit, uses max_history_turns instead)
+  max_history_tokens: 2000
 
 # UI Configuration
 ui:
