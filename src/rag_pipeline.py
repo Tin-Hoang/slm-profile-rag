@@ -300,13 +300,15 @@ Answer: """
         yield from self.stream_query(question, chat_history=chat_history)
 
     def get_source_documents(
-        self, question: str, _chat_history: list[dict] | None = None
+        self,
+        question: str,
+        chat_history: list[dict] | None = None,  # noqa: ARG002
     ) -> list[Document]:
         """Get source documents for a question (can run in parallel with streaming).
 
         Args:
             question: User question
-            _chat_history: Optional list of previous messages (not used for retrieval, kept for API consistency)
+            chat_history: Optional list of previous messages (not used for retrieval, kept for API consistency)
 
         Returns:
             List of source documents
