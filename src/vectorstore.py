@@ -28,10 +28,15 @@ class VectorStoreManager:
         device = self.config.get("embeddings.device", "cpu")
 
         # Initialize embeddings
+        # low_cpu_mem_usage=False avoids "Cannot copy out of meta tensor" error when
+        # transformers/accelerate loads models with meta device placement (Docker/constrained envs)
         logger.info(f"Initializing embeddings model: {embedding_model}")
         self.embeddings = HuggingFaceEmbeddings(
             model_name=embedding_model,
-            model_kwargs={"device": device},
+            model_kwargs={
+                "device": device,
+                "model_kwargs": {"low_cpu_mem_usage": False},
+            },
             encode_kwargs={"normalize_embeddings": True},
         )
 
