@@ -44,7 +44,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "ruff>=0.1.0",
+    "ruff>=0.14.6,<0.15.0",
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
 ]
